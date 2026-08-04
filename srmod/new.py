@@ -26,6 +26,18 @@ export function onGlobal() {{
 
 _NAME_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
 
+# Заполни Author/описания — это то, что игрок увидит в списке модов.
+_MODULE_INFO_TEMPLATE = '''Name={name}
+Author=
+Conflict=
+Dependence=
+Priority=5
+Section=
+Languages={languages}
+SmallDescription=
+FullDescription=
+'''
+
 
 def scaffold(dest, name, install=None, primary_lang='Rus', languages=None, force=False):
     dest = Path(dest)
@@ -35,7 +47,7 @@ def scaffold(dest, name, install=None, primary_lang='Rus', languages=None, force
     if dest.exists() and any(dest.iterdir()) and not force:
         raise BuildError(f'{dest}: не пусто (--force для игнора)')
     languages = languages or [primary_lang]
-    install = install or f'Mods/Artem/{name}'
+    install = install or f'Mods/{name}'
 
     (dest / 'DATA' / 'Script').mkdir(parents=True, exist_ok=True)
     (dest / 'CFG').mkdir(parents=True, exist_ok=True)
@@ -49,18 +61,23 @@ def scaffold(dest, name, install=None, primary_lang='Rus', languages=None, force
         _encode_datnik(lang_dir / 'Lang.txt', '', 'utf-16le')
 
     _encode_datnik(dest / 'CFG' / 'Main.txt', 'Data ~{\n}\n', 'utf-16le')
-    _encode_datnik(dest / 'ModuleInfo.txt', f'Name={name}\n', 'utf-16le')
 
+    # Поля — те же, что у реальных модов игры (сверено по 550 установленным):
+    # именно их читает менеджер модов, когда рисует список.
+    _encode_datnik(dest / 'ModuleInfo.txt', _MODULE_INFO_TEMPLATE.format(
+        name=name, languages=', '.join(languages)), 'utf-16le')
+
+    # Только то, что сборка реально читает. `lang.merge_into` и `deploy` из
+    # docs/STAGE0.md ещё не реализованы — в шаблон их не пишем, чтобы файл не
+    # обещал того, чего нет.
     project = {
         'name': name,
         'install': install,
         'languages': languages,
         'primary_lang': primary_lang,
         'script': {'engine': 'rsmc', 'entry': f'DATA/Script/{name}.rsm'},
-        'lang': {'merge_into': 'txt'},
         'media': {'gi_format': 'argb', 'gai_format': 'delta'},
         'packages': [],
-        'deploy': {'mode': 'junction'},
     }
     import json
     (dest / 'srmod.json').write_text(
