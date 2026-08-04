@@ -1,0 +1,271 @@
+{
+  "name": "sr-modkit",
+  "displayName": "SR Modkit — моды Space Rangers HD",
+  "description": "Подсветка скриптов .rsm и команды srmod (собрать, поставить в игру, проверить) прямо в VS Code",
+  "version": "0.1.0",
+  "publisher": "artyudin89",
+  "license": "GPL-3.0-or-later",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "space rangers",
+    "rangers",
+    "rsm",
+    "modding",
+    "srmod"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ArtYudin89/sr-modkit"
+  },
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onLanguage:rangers-script",
+    "workspaceContains:**/srmod.json"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "rangers-script",
+        "aliases": [
+          "Rangers Script",
+          "rsm"
+        ],
+        "extensions": [
+          ".rsm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "rangers-script",
+        "scopeName": "source.rangers-script",
+        "path": "./syntaxes/rangers-script.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "rangers-script",
+        "path": "./snippets/rangers-script.json"
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "srmod.json",
+        "url": "./schemas/srmod.schema.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "srmod.build",
+        "title": "Собрать мод",
+        "category": "srmod",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "srmod.buildAndDeploy",
+        "title": "Собрать и поставить в игру",
+        "category": "srmod",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "srmod.deploy",
+        "title": "Поставить в игру",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.lint",
+        "title": "Проверить скрипты (lint)",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.doctor",
+        "title": "Проверить инструменты (doctor)",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.verify",
+        "title": "Гейт доверия: сверить обе ветки сборки",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.new",
+        "title": "Создать новый мод…",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.open",
+        "title": "Открыть готовый мод (разобрать в исходники)…",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.watchStart",
+        "title": "Пересобирать при изменениях (watch)",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.watchStop",
+        "title": "Остановить watch",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.selectProject",
+        "title": "Выбрать мод, с которым работаем…",
+        "category": "srmod"
+      },
+      {
+        "command": "srmod.showOutput",
+        "title": "Показать вывод",
+        "category": "srmod"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "srmod.build",
+          "when": "resourceLangId == rangers-script",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "srmod.watchStop",
+          "when": "srmod.watching"
+        },
+        {
+          "command": "srmod.watchStart",
+          "when": "!srmod.watching"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "srmod.build",
+        "key": "ctrl+shift+b",
+        "when": "resourceLangId == rangers-script && !inDebugMode"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "srmod",
+        "required": [
+          "task"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "Подкоманда srmod",
+            "enum": [
+              "build",
+              "deploy",
+              "lint",
+              "verify",
+              "doctor"
+            ]
+          },
+          "project": {
+            "type": "string",
+            "description": "Каталог мода (где лежит srmod.json); по умолчанию — выбранный в расширении"
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "srmod-lint",
+        "owner": "srmod",
+        "source": "srmod",
+        "severity": "warning",
+        "fileLocation": [
+          "autoDetect",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.+?):(\\d+):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        }
+      }
+    ],
+    "configuration": {
+      "title": "SR Modkit",
+      "properties": {
+        "srmod.command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Чем запускать `srmod`, если автоопределение не сработало. Например `[\"py\", \"-3\", \"-m\", \"srmod\"]`. Пусто — определять самому: сначала `srmod` из PATH, потом `python -m srmod` из папки sr-modkit.",
+          "scope": "machine-overridable"
+        },
+        "srmod.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Команда Python для запуска `python -m srmod` (когда srmod не установлен через pip).",
+          "scope": "machine-overridable"
+        },
+        "srmod.repoPath": {
+          "type": "string",
+          "default": "",
+          "description": "Папка sr-modkit (та, внутри которой лежит каталог srmod). Нужна, только если расширение не нашло её само.",
+          "scope": "machine-overridable"
+        },
+        "srmod.tools.rsmc": {
+          "type": "string",
+          "default": "",
+          "description": "Путь к rsmc.exe. Пусто — как решит сам srmod (машинный config.json / автопоиск).",
+          "scope": "machine-overridable"
+        },
+        "srmod.tools.rscript": {
+          "type": "string",
+          "default": "",
+          "description": "Путь к RScript.exe.",
+          "scope": "machine-overridable"
+        },
+        "srmod.tools.blockpar": {
+          "type": "string",
+          "default": "",
+          "description": "Путь к BlockParEditor.exe.",
+          "scope": "machine-overridable"
+        },
+        "srmod.tools.game": {
+          "type": "string",
+          "default": "",
+          "description": "Папка игры Space Rangers HD: A War Apart.",
+          "scope": "machine-overridable"
+        },
+        "srmod.tools.decompiler": {
+          "type": "string",
+          "default": "",
+          "description": "Папка rson-decompiler (картинки и .dat).",
+          "scope": "machine-overridable"
+        },
+        "srmod.lintOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Проверять скрипты при сохранении .rsm и показывать замечания в панели «Проблемы»."
+        },
+        "srmod.buildOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Пересобирать мод при каждом сохранении. Для непрерывной сборки лучше команда «Пересобирать при изменениях (watch)»."
+        },
+        "srmod.statusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Показывать кнопку сборки в строке состояния."
+        }
+      }
+    }
+  }
+}

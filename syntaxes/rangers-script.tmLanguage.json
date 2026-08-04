@@ -1,0 +1,175 @@
+{
+ "name": "Rangers Script (Space Rangers HD)",
+ "scopeName": "source.rangers-script",
+ "fileTypes": [
+  "rsm"
+ ],
+ "foldingStartMarker": "\\{",
+ "foldingStopMarker": "\\}",
+ "patterns": [
+  {
+   "include": "#comment-block"
+  },
+  {
+   "include": "#comment-line"
+  },
+  {
+   "include": "#string-single"
+  },
+  {
+   "include": "#string-double"
+  },
+  {
+   "include": "#directive"
+  },
+  {
+   "include": "#rsm-import"
+  },
+  {
+   "include": "#function-definition"
+  },
+  {
+   "include": "#function-keyword"
+  },
+  {
+   "include": "#property-key"
+  },
+  {
+   "include": "#rsm-declaration"
+  },
+  {
+   "include": "#keyword-control"
+  },
+  {
+   "include": "#storage-type"
+  },
+  {
+   "include": "#boolean"
+  },
+  {
+   "include": "#builtin-function"
+  },
+  {
+   "include": "#custom-function"
+  },
+  {
+   "include": "#builtin-constant"
+  },
+  {
+   "include": "#number"
+  },
+  {
+   "include": "#operator"
+  },
+  {
+   "include": "#punctuation"
+  },
+  {
+   "include": "#identifier"
+  }
+ ],
+ "repository": {
+  "comment-block": {
+   "name": "comment.block.rangers-script",
+   "begin": "/\\*",
+   "end": "\\*/"
+  },
+  "comment-line": {
+   "name": "comment.line.double-slash.rangers-script",
+   "match": "//.*"
+  },
+  "string-single": {
+   "name": "string.quoted.single.rangers-script",
+   "begin": "'",
+   "end": "'|$",
+   "patterns": [
+    {
+     "name": "constant.character.escape.rangers-script",
+     "match": "\\\\."
+    }
+   ]
+  },
+  "string-double": {
+   "name": "string.quoted.double.rangers-script",
+   "begin": "\"",
+   "end": "\"|$",
+   "patterns": [
+    {
+     "name": "constant.character.escape.rangers-script",
+     "match": "\\\\."
+    }
+   ]
+  },
+  "directive": {
+   "name": "meta.preprocessor.rangers-script",
+   "match": "#.*"
+  },
+  "rsm-import": {
+   "name": "keyword.control.import.rangers-script",
+   "match": "\\b(?:export|import|from)\\b"
+  },
+  "function-definition": {
+   "match": "\\b(function)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+   "captures": {
+    "1": {
+     "name": "storage.type.function.rangers-script"
+    },
+    "2": {
+     "name": "entity.name.function.rangers-script"
+    }
+   }
+  },
+  "function-keyword": {
+   "name": "storage.type.function.rangers-script",
+   "match": "\\bfunction\\b"
+  },
+  "property-key": {
+   "name": "variable.other.property.rangers-script",
+   "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*:)"
+  },
+  "rsm-declaration": {
+   "name": "storage.type.declaration.rangers-script",
+   "match": "\\b(?:constellation|dialogAnswer|scriptName|dialogMsg|globalVar|groupLink|localVar|starLink|dialog|planet|ether|group|place|state|item|ship|star)\\b(?=\\s*\\()"
+  },
+  "keyword-control": {
+   "name": "keyword.control.rangers-script",
+   "match": "\\b(?:continue|result|break|throw|while|else|exit|for|if)\\b"
+  },
+  "storage-type": {
+   "name": "storage.type.rangers-script",
+   "match": "\\b(?:unknown|dword|float|int|ref|str)\\b"
+  },
+  "boolean": {
+   "name": "constant.language.boolean.rangers-script",
+   "match": "\\b(?:true|false)\\b"
+  },
+  "builtin-function": {
+   "name": "support.function.builtin.rangers-script",
+   "match": "\\b(?:BuildListOfQuestPossibleLocations|GetCustomWeaponPrimaryDamageType|GalaxyDominatorResearchMaterial|PlayerPlanetaryBattlesCompleted|GalaxyDominatorResearchPercent|ItemExtraSpecialsDeleteByType|ShipCustomShipInfoDescription|ChangeGlobalRelationsPlanets|ItemExtraSpecialsCountByType|ShipFindCustomShipInfoByType|StarFindCustomStarInfoByType|GenerateCodeStringFromBlock|SetCustomMissileWeaponStats|SetCustomWeaponAvailability|ShipStrengthInAverageRanger|StarListToTransitPlanetList|ChangeGlobalRelationsShips|CreateEquipmentWithSpecial|ItemExtraSpecialsAddByType|SetCustomWeaponPrimaryData|SetCustomWeaponSizeAndCost|ShipCustomShipInfoTextData|ShipKillFactionInCurSystem|StarMapCustomSelectionMode|ConChangeRelationToRanger|CreateCustomCountableItem|SetCustomWeaponDamageData|DistToNearestEnemySystem|GetAchievementCOALLITION|GetAchievementGIRLSQUEST|HullDamageSuspectibility|PlanetCurInventionPoints|PlayerDominatorStatistic|RangerExcludedFromRating|ShipCustomShipInfosCount|ShipDeleteCustomShipInfo|ShipGoodsIllegalOnPlanet|ShipNextPirateRankPoints|ShipStrengthInBestRanger|StarCustomStarInfosCount|StarDeleteCustomStarInfo|BuildListOfMMByPriority|FindPlanetByAdvancement|GetAchievementGIRLSHIRE|GetAchievementPIRATEWIN|PlayerChameleonDetected|RuinsAllowModernization|SetCustomWeaponShotData|DomikKilledInCurSystem|GlobalRelationsPlanets|PlayerChameleonCharges|PlayerChameleonCurType|ShipCustomShipInfoData|ShipHealthFactorStatus|ShipTechLevelKnowledge|ShipTurnBeforeEndOrder|StarCustomStarInfoData|StarMapBlinkingMessage|ArtTranclucatorToShip|BlazerSelfDestruction|ExecuteCodeFromString|InventNewCustomWeapon|OnUseCodeTranclucator|PlanetBoostInventions|PlanetOrbitalVelocity|PlanetTerrainExplored|PlayerMayTakeSubCrack|PlayerQuestInProgress|PlayerQuestsCompleted|ReleaseItemFromScript|RuinsMicromoduleChain|RunFunctionFromScript|ShipAddCustomShipInfo|StarAddCustomStarInfo|CustomInterfaceImage|CustomInterfaceState|FindBonusByCustomTag|FindBonusByNameInCfg|GalaxyEventsTextData|GlobalRelationsShips|OnUseCodeTransmitter|PlanetInventionLevel|PlayerDepositPercent|PlayerLogicChameleon|ScriptItemActObject1|ScriptItemActObject2|ScriptItemActionType|ShipOnSidePirateClan|ShipPirateRankPoints|StarEnemyThreatLevel|StarListToPlanetList|ArtefactTypeBoosted|BuildListOfNewShips|CustomInterfacePosZ|CustomInterfaceSize|CustomInterfaceText|GetCustomWeaponData|GetCustomWeaponInfo|GetNodesFromStorage|MarkRobotsMapAsUsed|OnUseCodeMissileDef|PlanetCustomFaction|PlayerTranclucators|RangerPlaceInRating|StarNearbyStarsDist|StorageItemLocation|SwitchToMirrorImage|WeaponMaxAmmunition|CreateActCodeEvent|CreateCustomWeapon|CustomInterfacePos|EquipmentImageName|GetAchievementHULL|GetItemFromStorage|GetValueFromScript|OnUseCodeBlackHole|PlanetCurInvention|ScriptItemActParam|ScriptItemTextData|ShipNextRankPoints|ShipProtectability|ShipSpecialBonuses|SpecialToEquipment|AddDialogOverride|ArrayFindInSorted|ArtefactTypeInUse|CoalitionDefeated|ControlledSystems|CustomArtTextData|CustomMissileType|CustomWeaponTypes|DeleteRewardByNom|DomikProgrammDate|FindItemInStorage|GameDateTxtByTurn|GetAchievementSHU|GetEquipmentStats|GetItemFromPlanet|GetRelationPlanet|GetShipHomePlanet|GetShipPirateRank|ItemExtraSpecials|KellerNewResearch|MakeShipEnterStar|ModuleToEquipment|NoComeKlingToStar|PlanetOrbitRadius|PlayerDepositDate|QuestsStatusByNom|ScriptItemActShip|SetCustomWeaponSE|SetEquipmentStats|SetRelationPlanet|ShipAverageDamage|ShipCustomFaction|ShipInNormalSpace|StarCustomFaction|StarMapCenterView|TerronLandingLock|TruceBetweenShips|UselessItemCreate|AddItemToStorage|AddJournalRecord|ArraySortPartial|AsteroidMinerals|BuildCustomRuins|BuyDomikExtremal|CapitalShipStats|CountRewardByNom|CustomWeaponType|DealDamageToShip|DropItemInSystem|FindSeriesByName|GalaxyDiffLevels|GetItemFromVault|GetNodesFromShip|GetShipExpByType|GoodsRuinsForBuy|ImportedFunction|LinkItemToScript|MissileMaxDamage|MissileMinDamage|PlanetExtraFlags|PlanetPirateClan|PlanetPopulation|PlayerDepositDay|RelationToRanger|ScriptActionsRun|ScriptItemToItem|SetRelationGroup|ShipHealthFactor|ShipImproveItems|ShipInHyperSpace|ShipInPirateClan|ShipStatusEffect|ShowStaticEffect|StarAngleBetween|TerronWeaponLock|TranclucatorData|WeaponAmmunition|ABShipModifiers|AddDialogInject|AddItemToPlanet|AsteroidRespawn|BuyTranclucator|CloseCustomForm|ConvertToABShip|CreateCustomArt|CreateEquipment|CreateQuestItem|DeleteEquipment|EqCustomFaction|ExtremalTakeOff|FindBonusByName|FormShipCurItem|GalaxyEventData|GalaxyEventDate|GalaxyEventType|GalaxyTechLevel|GetItemFromShip|GetItemFromShop|GetItemFromStar|GetVariableName|GetVariableType|GiveRewardByNom|ItemCanBeBroken|ItemImprovement|MayAddBonusToEq|MessageBoxYesNo|MissileWeaponID|MissilesToRearm|NearCivilPlanet|OrderFollowShip|PlayerMedPolicy|RaisePirateRank|RangerBaseNodes|RuinsChangeType|ShipAddDropItem|ShipCanRepairEq|ShipDestination|ShipDestroyType|ShipDroidRepair|ShipInCurScript|ShipInGameEvent|ShipScanerPower|StarNearbyStars|UseTranclucator|UselessItemData|UselessItemText|libraryfunction|AddDialogBlock|ArrayRandomize|BonusCustomTag|BonusIsSpecial|DomiksDefeated|DropScriptItem|FindItemInShip|FirstGiveMoney|GetArtFromShip|GetGameOptions|GoodsSellPrice|HoleMamaCreate|HoleTurnCreate|InterfaceImage|InterfaceState|IsScriptActive|ItemDurability|NoTargetToShip|OpenCustomForm|PlanetGetGraph|PlanetNewsDate|PlanetNewsText|PlanetNewsType|PlanetSetGoods|PlanetSetGraph|PlanetWarriors|PlayerDebtDate|PlayerImmunity|PutItemInVault|RangersCapital|RelationToShip|ScriptItemData|SeriesNumInCfg|ShipChangeStar|ShipFreeFlight|ShipOrderData1|ShipOrderData2|ShipRadarRange|ShipRankPoints|ShipSetPartner|StarMapCurPosX|StarMapCurPosY|StartTextQuest|StopMovingItem|TerronGrowLock|UICheckElement|UpdateFormShip|AddItemToShip|AddItemToShop|AddPlanetNews|AsteroidGraph|BlazerLanding|BonusNumInCfg|BonusPriority|BuyBigWarrior|ContainerFuel|CustomArtData|DomikProgramm|EtherIdDelete|ExistingZonds|GalaxyRangers|GalaxySectors|GetShipPlanet|GoodsBuyPrice|InterfaceSize|InterfaceText|ItemFragility|ItemOnActCode|ItemOnUseCode|LaunchMissile|MissileTarget|MusicControls|OrderJumpHole|OrderTeleport|PlanetTerrain|PlayerDebtCnt|PlayerDeposit|PlayerPirates|ResourceExist|SectorVisible|ShipCalcParam|ShipCntWeapon|ShipFreeSpace|ShipHookPower|ShipHookRange|ShipIsPartner|ShipIsTakeoff|ShipJoinsClan|ShipPicksItem|ShipPilotRace|ShipRaiseRank|ShipSetCoords|ShipStatistic|StarAsteroids|ArrangeItems|BuyTransport|CreateABShip|CreatePlanet|ForceNextDay|GLastTurnRun|GalaxyEvents|GalaxyShipId|GetShipRuins|HaveProgramm|InjectAnswer|InterfacePos|ItemFullName|ItemInScript|ItemIsBroken|MissileAngle|MissileOwner|MissileSpeed|NearestGroup|NoDropToShip|NoScanToShip|NoShopUpdate|NoTalkToShip|OrderForsage|OrderLanding|OrderTakeOff|PlanetToStar|PlayerBridge|RangerStatus|RobotSupport|RunChildForm|ShipCanUseEq|ShipEqInSlot|ShipInPlanet|ShipInPrison|ShipInScript|ShipOrderObj|ShipPartners|ShipRepairEq|ShipStanding|SkipGreeting|SpawnMissile|StarFonImage|StarMapLabel|StarMissiles|StarSetGraph|StatusPlayer|StorageItems|SubCrackCost|TerronToStar|TransferShip|UpsurgeGoods|WeaponTarget|ArrayDelete|ButtonClick|CanSellItem|ChanceToWin|ChangeState|CountReward|CreateGoods|CreateNodes|CurrentForm|CurrentMods|CustomEther|EnginePower|EtherDelete|FormCurShip|GalaxyHoles|GalaxyMoney|GalaxyStars|GetMainData|GetProgramm|GetTalkShip|GetTalkType|GroupSetBad|GroupToShip|HoleCreate2|HullSpecial|IsChameleon|ItemDestroy|ItemIsInSet|ItemIsInUse|ItemSubrace|KellerLeave|MissileLive|MissileStar|MissileType|PlanetItems|PlanetOwner|PlayerEqSet|SeriesCount|SetProgramm|ShipCanJump|ShipConnect|ShipDestroy|ShipFreeExp|ShipFuelLow|ShipSubType|StarPlanets|StartRobots|arraychange|freelibrary|loadlibrary|AllShipOut|ArrayClear|AutoBattle|BlockExist|BonusCount|BonusValue|BuildRuins|BuyWarrior|CreateHull|CreateZond|CustomLose|DecayGoods|DeleteTags|EtherIdAdd|EtherState|FindPlanet|FireWeapon|FormChange|GAllCntRun|GalaxyStar|GiveReward|GoodsCount|GroupCount|HoleCreate|HullDamage|HullSeries|IdToPlanet|ItemCharge|KellerKill|MessageBox|NoDropItem|ObjectType|PirateType|PlanetName|PlanetNews|PlanetRace|PlanetSize|PlayerDebt|ShipGetBad|ShipInFear|ShipInHole|ShipInStar|ShipRefuel|ShipSetBad|ShipStatus|ShipWealth|ShipWeapon|ShowEffect|StarBattle|StarSeries|StartMusic|StartVideo|findsubstr|ArrayFind|ArraySort|BonusName|BonusText|BuyPirate|BuyRanger|Chameleon|CountTurn|CreateArt|CustomWin|Dist2Star|EqSpecial|FilmFlags|FilmSound|GalaxyPtr|GoodsCost|GoodsDrop|GroupShip|Hitpoints|HoleGraph|HoleStar1|HoleStar2|ImportAll|ItemCount|ItemExist|ItemLevel|ItemOwner|NoLanding|NumberBox|OrderJump|OrderLock|OrderMove|OrderNone|PirateWin|PlanetEco|PlanetGov|ScriptRun|ShipAngle|ShipArmor|ShipGoods|ShipGroup|ShipItems|ShipMoney|ShipOrder|ShipOwner|ShipRefit|ShipSkill|ShipSlots|ShipSpeed|ShipTypeN|ShopItems|ShortName|StarAngle|StarHoles|StarItems|StarOwner|StarRuins|StarShips|StarToCon|TipsState|WeaponHit|lowercase|randomize|tounicode|uppercase|ArrayAdd|ArrayDim|BuyDomik|ConStars|CountBox|CreateMM|DAddText|DeltaWin|DropItem|EqModule|FreeItem|GetOwner|GoodsAdd|HullType|IdToItem|IdToShip|IsPlayer|ItemCost|ItemName|ItemSize|ItemType|SetFocus|ShipArts|ShipData|ShipFace|ShipFind|ShipFuel|ShipJoin|ShipJump|ShipName|ShipRank|ShipStar|ShipType|StarName|TalkByAI|newarray|randseed|ConName|ConNear|ConStar|CountIn|CurInfo|CurItem|CurTurn|DAnswer|DChange|EndGame|GCntRun|GetData|GotoGov|GroupIn|GroupIs|HoleMap|ListBox|NewsAdd|SetData|SetName|ShipOut|StartAB|StateIs|TextBox|Blazer|CoordX|CoordY|Dialog|Format|HoleX1|HoleX2|HoleY1|HoleY2|HullHP|IsFilm|ItemIn|Keller|MsgAdd|NoJump|Player|Terron|arctan|delete|substr|toansi|Angle|DText|Ether|Sound|count|round|DAdd|Dist|GRun|Name|Tips|copy|frac|free|sqrt|trim|Hit|Rnd|SFT|abs|cos|exp|max|min|new|ord|sin|sqr|CT|Id|ln)\\b"
+  },
+  "custom-function": {
+   "name": "support.function.custom.rangers-script",
+   "match": "\\b(?:AdjustRuinsGoodsPricesToStorage|GetScriptNoKlingMarksFromStar|GetSectorAdjacentToDicea|GetObjectGenerationSeed|UtilityFunctionsLibInit|GetStringFromClipboard|AdvancedAdjustmentSet|SendStringToClipboard|GetPlanetOrbitProbe|ParsCountFromString|PlanetItemsHiddency|IsShiftCtrlPressed|ShipExchangeToShip|CustomArtCostCalc|CustomArtSizeCalc|GetShipScriptName|HullExtraSettings|PortionInDiapason|SetRangersCapital|GetParFromString|OpenExternalLink|SetParFromString|SetShipExpByType|ShipJoinToScript|ShipNearbyShips|ShipVisibility|FloatToString|GetParFromTxt|SetParFromTxt|ShipPrevStar|GetShipPath|SetShipPath|ShipSubrace|TrimNumbers|DistCoords|HoleStatus|RndObject|IdToHole|RndFloat|RoundTo|Power)\\b"
+  },
+  "builtin-constant": {
+   "name": "support.constant.rangers-script",
+   "match": "\\b(?:t_OnCheckingUsabilityGoods|t_OnCustomTargettingCheck|t_OnMissileHittingObject|t_OnPlayerTalkedWithShip|t_OnShipTalkedWithPlayer|t_OnMovingItemToStorage|t_OnNonStandartEqChange|t_OnPlayerSkillIncrease|t_OnReEnteringOtherShip|t_ArtefactTranclucator|t_OnChameleonConfusion|t_OnCheckingUsability2|t_OnDealingFatalDamage|t_UselessCountableItem|t_ArtefactTransmitter|t_OnCheckingUsability|t_OnEnteringOtherShip|t_OnGettingMissileHit|bonExtraAkrinPenalty|t_OnCustomTargetting|t_OnGettingWeaponHit|t_OnLeavingOtherShip|t_OnPlayerChangeHull|ForLiberationSystem|progLogicalNegation|t_OnReduceEqForsage|t_OnScanPossibility|t_OnShowingItemInfo|t_OnShowingShipInfo|t_OnShowingStarInfo|t_ArtWeaponToSpeed|t_ArtefactAnalyzer|t_ArtefactAntigrav|t_ArtefactMiniExpl|t_OnReEnteringForm|t_OnReduceEqBattle|t_OnShipSellsGoods|t_OnTakingDamageEn|t_OnTakingDamageMi|t_OnTakingDamageSp|ForAccomplishment|TalkPartnerTheEnd|bonResistAsteroid|t_OnDealingDamage|t_OnDropItemFixed|t_OnGovItemReward|t_OnReduceEqForce|t_OnShipBuysGoods|ForSecretMission|TalkBreakPartner|bonExtraAkrinEff|t_ArtDefToEnergy|t_ArtEnergyPulse|t_ArtefactScaner|t_OnAnotherGoods|t_OnAnotherItem2|t_OnEnteringForm|t_OnMissileShot2|t_OnTakingDamage|t_OnTrancPacking|ForPlanetBattle|TalkPartnerRiot|bonHookMaxSpeed|bonHookMinSpeed|bonMissileSpeed|bonStimCapacity|t_ArtArtefactor|t_ArtDecelerate|t_ArtDefToArms1|t_ArtDefToArms2|t_ArtMissileDef|t_ArtefactDroid|t_ArtefactPower|t_ArtefactRadar|t_ArtefactSpeed|t_OnAnotherItem|t_OnDroidRepair|t_OnItemDeEquip|t_OnItemDestroy|t_OnLeavingForm|t_OnMissileShot|t_OnPlayerBuyEq|t_OnPlayerUseMM|t_OnReduceEqUse|t_OnWeaponShot2|bonSlotForsage|progDematerial|progEnergotron|progKellerCall|t_ArtBlackHole|t_ArtEnergyDef|t_ArtFastRacks|t_ArtGiperJump|t_ArtefactBomb|t_ArtefactFuel|t_ArtefactHook|t_ArtefactHull|t_ArtefactNano|t_CustomWeapon|t_DefGenerator|t_OnABItemDrop|t_OnItemPickUp|t_OnWeaponShot|t_Tranclucator|bonHookRadius|bonSlotScaner|bonSlotWeapon|t_ArtPDTurret|t_ArtSplinter|t_ArtefactDef|t_MicroModule|t_OnItemEquip|t_RepairRobot|t_UselessItem|ForCowardice|GQuestStatus|GVideoStatus|bonShotSpeed|bonSlotDroid|bonSlotRadar|bonWSplinter|progIntercom|progSabCrack|t_ArtForsage|t_OnDropItem|t_Protoplasm|GAnswerData|GScriptName|UselessItem|bonSlotHook|bonWMissile|t_Artefact2|t_CargoHook|t_FuelTanks|t_Narcotics|t_OnItemHit|t_OnStartAB|t_Satellite|t_Transport|ForPerfidy|PirateClan|TalkAttack|bonAIValue|bonAttacks|bonSlotArt|bonSlotDef|bonWEnergy|bonWRadius|t_Artefact|t_Medicine|t_Minerals|t_Technics|t_Weapon10|t_Weapon11|t_Weapon12|t_Weapon13|t_Weapon14|t_Weapon15|t_Weapon16|t_Weapon17|t_Weapon18|GABStatus|TalkGoods|TalkMoney|TalkTruce|bonSkill1|bonSkill2|bonSkill3|bonSkill4|bonSkill5|bonSkill6|t_Alcohol|t_Cistern|t_OnDeath|t_Warrior|t_Weapon1|t_Weapon2|t_Weapon3|t_Weapon4|t_Weapon5|t_Weapon6|t_Weapon7|t_Weapon8|t_Weapon9|EndState|GRunFrom|ReNormal|bonDroid|bonRadar|bonShots|bonSpeed|bonZonds|t_ArtBio|t_Engine|t_Luxury|t_OnScan|t_OnStep|t_Pirate|t_Ranger|t_Scaner|CurShip|Warrior|bonAmmo|bonFuel|bonHook|bonHull|bonJump|bonMass|bonNull|bonScan|t_Kling|t_Radar|Peleng|People|Pirate|ReBest|ReGood|Trader|bonDef|clrEnd|t_Arms|t_Food|t_Hull|Kling|Maloc|ReBad|ReWar|color|Gaal|None|t_BK|t_CB|t_MC|t_PB|t_RC|t_SB|t_UB|t_WB|Fei|clr|br|pi)\\b"
+  },
+  "number": {
+   "name": "constant.numeric.rangers-script",
+   "match": "\\b[0-9]+\\.?[0-9]*\\b"
+  },
+  "operator": {
+   "name": "keyword.operator.rangers-script",
+   "match": "[-+*/%=!&|^~<>]"
+  },
+  "punctuation": {
+   "name": "punctuation.section.rangers-script",
+   "match": "[\\[\\](){},;.:]"
+  },
+  "identifier": {
+   "name": "variable.other.rangers-script",
+   "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+  }
+ }
+}

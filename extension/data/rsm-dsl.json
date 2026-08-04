@@ -1,0 +1,511 @@
+{
+  "_source": "сгенерировано tools/build_dsl_schema.py из rsmc.exe (таблица строк + опрос живого компилятора)",
+  "rsmc": "rsmc.exe",
+  "declarations": {
+    "scriptName": {
+      "positional": [
+        "name"
+      ],
+      "fields": []
+    },
+    "constellation": {
+      "positional": [
+        "name"
+      ],
+      "fields": []
+    },
+    "star": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "constellation",
+        "noKling",
+        "noComeKling"
+      ]
+    },
+    "planet": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "star",
+        "race",
+        "owner",
+        "economy",
+        "government",
+        "rangeMin",
+        "rangeMax",
+        "dialog"
+      ],
+      "required": [
+        "star"
+      ],
+      "enums": {
+        "race": {
+          "values": [
+            "GroupToggle",
+            "Maloc",
+            "Peleng",
+            "People",
+            "Fei",
+            "Gaal"
+          ],
+          "validated": true
+        },
+        "owner": {
+          "values": [
+            "GroupToggle",
+            "Maloc",
+            "Peleng",
+            "People",
+            "Fei",
+            "Gaal",
+            "Kling",
+            "None",
+            "Pirate",
+            "ByPlayer"
+          ],
+          "validated": true
+        },
+        "economy": {
+          "values": [
+            "GroupToggle",
+            "Agriculture",
+            "Industrial",
+            "Mixed"
+          ],
+          "validated": true
+        },
+        "government": {
+          "values": [
+            "GroupToggle",
+            "Anarchy",
+            "Dictatorship",
+            "Monarchy",
+            "Republic",
+            "Democracy"
+          ],
+          "validated": true
+        }
+      }
+    },
+    "ship": {
+      "positional": [],
+      "fields": [
+        "star",
+        "player",
+        "count",
+        "owner",
+        "type",
+        "speedMin",
+        "speedMax",
+        "weapon",
+        "cargoHook",
+        "emptySpace",
+        "statusTraderMin",
+        "statusTraderMax",
+        "statusWarriorMin",
+        "statusWarriorMax",
+        "statusPirateMin",
+        "statusPirateMax",
+        "strengthMin",
+        "strengthMax",
+        "ruins"
+      ],
+      "required": [
+        "star"
+      ],
+      "enums": {
+        "owner": {
+          "values": [
+            "GroupToggle",
+            "Maloc",
+            "Peleng",
+            "People",
+            "Fei",
+            "Gaal",
+            "Kling",
+            "Pirate",
+            "ByPlayer"
+          ],
+          "validated": true
+        },
+        "type": {
+          "values": [
+            "GroupToggle",
+            "Ranger",
+            "Warrior",
+            "Pirate",
+            "Transport",
+            "Liner",
+            "Diplomat",
+            "Blazer0",
+            "Blazer1",
+            "Blazer2",
+            "Blazer3",
+            "Blazer4",
+            "Blazer5",
+            "Keller0",
+            "Keller1",
+            "Keller2",
+            "Keller3",
+            "Keller4",
+            "Keller5",
+            "Terron0",
+            "Terron1",
+            "Terron2",
+            "Terron3",
+            "Terron4",
+            "Terron5",
+            "Tranclucator",
+            "Blazer6",
+            "Blazer7",
+            "Keller6",
+            "Keller7",
+            "Terron6",
+            "Terron7"
+          ],
+          "validated": true
+        }
+      }
+    },
+    "state": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "move",
+        "moveObj",
+        "attack",
+        "takeItem",
+        "takeAllItem",
+        "onTalk",
+        "onTalkCode",
+        "onActCode",
+        "ether",
+        "code",
+        "transitions"
+      ],
+      "entryShapes": {
+        "transitions": [
+          "to",
+          "when"
+        ]
+      },
+      "codeFields": [
+        "onTalkCode",
+        "onActCode",
+        "code"
+      ],
+      "enums": {
+        "move": {
+          "values": [
+            "none",
+            "move",
+            "follow",
+            "jump",
+            "landing",
+            "free"
+          ],
+          "validated": true
+        }
+      }
+    },
+    "group": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "planet",
+        "state",
+        "owner",
+        "type",
+        "countMin",
+        "countMax",
+        "speedMin",
+        "speedMax",
+        "weapon",
+        "cargoHook",
+        "emptySpace",
+        "dialog",
+        "addPlayer",
+        "statusTraderMin",
+        "statusTraderMax",
+        "statusWarriorMin",
+        "statusWarriorMax",
+        "statusPirateMin",
+        "statusPirateMax",
+        "distSearch",
+        "strengthMin",
+        "strengthMax",
+        "ruins"
+      ],
+      "required": [
+        "planet",
+        "state"
+      ],
+      "enums": {
+        "owner": {
+          "values": [
+            "GroupToggle",
+            "Maloc",
+            "Peleng",
+            "People",
+            "Fei",
+            "Gaal",
+            "Kling",
+            "Pirate",
+            "ByPlayer"
+          ],
+          "validated": true
+        },
+        "type": {
+          "values": [
+            "GroupToggle",
+            "Ranger",
+            "Warrior",
+            "Pirate",
+            "Transport",
+            "Liner",
+            "Diplomat",
+            "Blazer0",
+            "Blazer1",
+            "Blazer2",
+            "Blazer3",
+            "Blazer4",
+            "Blazer5",
+            "Keller0",
+            "Keller1",
+            "Keller2",
+            "Keller3",
+            "Keller4",
+            "Keller5",
+            "Terron0",
+            "Terron1",
+            "Terron2",
+            "Terron3",
+            "Terron4",
+            "Terron5",
+            "Tranclucator",
+            "Blazer6",
+            "Blazer7",
+            "Keller6",
+            "Keller7",
+            "Terron6",
+            "Terron7"
+          ],
+          "validated": true
+        }
+      }
+    },
+    "place": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "type",
+        "star",
+        "obj1",
+        "obj2",
+        "angle",
+        "dist",
+        "radius"
+      ],
+      "required": [
+        "type"
+      ],
+      "enums": {
+        "type": {
+          "values": [
+            "free",
+            "nearPlanet",
+            "inPlanet",
+            "toStar",
+            "nearItem",
+            "fromShip",
+            "coords"
+          ],
+          "validated": true
+        }
+      }
+    },
+    "item": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "at",
+        "mainType",
+        "type",
+        "size",
+        "level",
+        "radius",
+        "owner",
+        "useless"
+      ],
+      "enums": {
+        "mainType": {
+          "values": [
+            "Equipment",
+            "Weapon",
+            "Goods",
+            "Artefact",
+            "Useless",
+            "Unknown"
+          ],
+          "validated": true
+        },
+        "owner": {
+          "values": [
+            "Maloc",
+            "Peleng",
+            "People",
+            "Fei",
+            "Gaal",
+            "Kling",
+            "None",
+            "PirateClan"
+          ],
+          "validated": true
+        }
+      }
+    },
+    "ether": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "type",
+        "msg",
+        "unique"
+      ],
+      "required": [
+        "msg"
+      ]
+    },
+    "groupLink": {
+      "positional": [
+        "fromGroup",
+        "toGroup"
+      ],
+      "fields": [
+        "rel1",
+        "rel2",
+        "warWeightMin",
+        "warWeightMax"
+      ]
+    },
+    "starLink": {
+      "positional": [
+        "fromStar",
+        "toStar"
+      ],
+      "fields": [
+        "distMin",
+        "distMax",
+        "hole"
+      ]
+    },
+    "dialog": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "message",
+        "code"
+      ],
+      "codeFields": [
+        "code"
+      ]
+    },
+    "dialogMsg": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "text",
+        "command",
+        "code",
+        "answers"
+      ],
+      "entryShapes": {
+        "answers": [
+          "name",
+          "names",
+          "when"
+        ]
+      },
+      "codeFields": [
+        "code"
+      ]
+    },
+    "dialogAnswer": {
+      "positional": [
+        "name"
+      ],
+      "fields": [
+        "text",
+        "next",
+        "answerCommand",
+        "code"
+      ],
+      "codeFields": [
+        "code"
+      ],
+      "enums": {
+        "answerCommand": {
+          "values": [
+            "restart",
+            "exit",
+            "shop",
+            "hangar",
+            "planet",
+            "fastexit"
+          ],
+          "validated": false
+        }
+      }
+    },
+    "globalVar": {
+      "positional": [
+        "name",
+        "type"
+      ],
+      "fields": [
+        "init"
+      ]
+    },
+    "localVar": {
+      "positional": [
+        "name",
+        "type"
+      ],
+      "fields": [
+        "init"
+      ]
+    }
+  },
+  "exports": [
+    "onGlobal",
+    "onInit",
+    "onTurn",
+    "onDialogBegin"
+  ],
+  "varTypes": [
+    "unknown",
+    "int",
+    "dword",
+    "str",
+    "float",
+    "array"
+  ],
+  "unvalidatedFields": [
+    "dialogAnswer.answerCommand",
+    "ether.type",
+    "groupLink.rel1",
+    "item.type",
+    "item.useless",
+    "starLink.hole"
+  ]
+}

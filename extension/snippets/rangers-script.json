@@ -1,0 +1,152 @@
+{
+  "_comment": "Ключи опций сверены по корпусу декомпилированных модов (tools/build_grammar.py --check работает по тому же набору): выдуманных полей здесь нет.",
+  "scriptName": {
+    "prefix": "scriptName",
+    "body": ["scriptName(\"${1:MyMod}\");"],
+    "description": "Имя скрипта. Обязано совпадать с name в srmod.json и с именем .scr"
+  },
+  "import": {
+    "prefix": "import",
+    "body": ["import from './${1:vars}.rsm';"],
+    "description": "Подключить модуль рядом с точкой входа"
+  },
+  "globalVar": {
+    "prefix": "globalVar",
+    "body": ["globalVar(\"${1:vName}\", \"${2|int,float,str,dword|}\", \"${3:0}\");"],
+    "description": "Переменная, видимая и другим скриптам (GetValueFromScript)"
+  },
+  "localVar": {
+    "prefix": "localVar",
+    "body": ["localVar(\"${1:vName}\", \"${2|int,float,str,dword|}\", \"${3:0}\");"],
+    "description": "Переменная только этого скрипта"
+  },
+  "star": {
+    "prefix": "star",
+    "body": ["star(\"${1:MainStar}\", {noKling: ${2|false,true|}, noComeKling: ${3|false,true|}});"],
+    "description": "Звёздная система, в которой работает скрипт"
+  },
+  "planet": {
+    "prefix": "planet",
+    "body": [
+      "planet(\"${1:MainPlanet}\", {star: \"${2:MainStar}\", race: [\"Maloc\", \"Peleng\", \"People\", \"Fei\", \"Gaal\"], owner: [\"Maloc\", \"Peleng\", \"People\", \"Fei\", \"Gaal\"], economy: [\"Agriculture\", \"Industrial\", \"Mixed\"], government: [\"Anarchy\", \"Dictatorship\", \"Monarchy\", \"Republic\", \"Democracy\"], rangeMin: ${3:0}, rangeMax: ${4:100}});"
+    ],
+    "description": "Планета: списки — «любой из», игра выбирает подходящую сама"
+  },
+  "ship (игрок)": {
+    "prefix": "ship",
+    "body": [
+      "ship({star: \"${1:MainStar}\", player: true, count: 1, owner: [\"Maloc\", \"Peleng\", \"People\", \"Fei\", \"Gaal\"], type: [\"Ranger\", \"Warrior\", \"Pirate\", \"Transport\", \"Liner\", \"Diplomat\"], speedMin: 0, speedMax: 10000, weapon: 0, cargoHook: 0, emptySpace: 0, statusTraderMin: 0, statusTraderMax: 100, statusWarriorMin: 0, statusWarriorMax: 100, statusPirateMin: 0, statusPirateMax: 100, strengthMin: 0, strengthMax: 0, ruins: \"\"});"
+    ],
+    "description": "Требование к кораблю игрока — скрипт стартует, когда игрок ему соответствует"
+  },
+  "group": {
+    "prefix": "group",
+    "body": [
+      "group(\"${1:Greeter}\", {planet: \"${2:MainPlanet}\", state: \"${3:StGreeter}\", owner: [\"Maloc\", \"Peleng\", \"People\", \"Fei\", \"Gaal\"], type: [\"Ranger\"], countMin: 1, countMax: 1, speedMin: 100, speedMax: 10000, weapon: 0, cargoHook: 0, emptySpace: 0, addPlayer: false, statusTraderMin: 0, statusTraderMax: 100, statusWarriorMin: 0, statusWarriorMax: 100, statusPirateMin: 0, statusPirateMax: 100, distSearch: 10000, strengthMin: 0, strengthMax: 0, ruins: \"\"});"
+    ],
+    "description": "Группа NPC, живущая в состоянии state"
+  },
+  "place": {
+    "prefix": "place",
+    "body": ["place(\"${1:plName}\", {type: \"${2|nearItem,nearPlanet,inSpace,nearStar|}\", angle: ${3:0}, dist: ${4:0.5}, radius: ${5:20}, obj1: \"${6:iItem}\", star: \"${7:MainStar}\"});"],
+    "description": "Точка в системе (привязка к объекту)"
+  },
+  "item": {
+    "prefix": "item",
+    "body": ["item(\"${1:iName}\", {mainType: \"${2|Useless,Equipment,Weapon,Goods,Artefact|}\", type: ${3:0}, size: ${4:10}, level: ${5:1}, radius: ${6:150}, owner: \"${7:None}\", useless: \"${8:Capsule}\", at: \"${9:GroupOrPlace}\"});"],
+    "description": "Предмет скрипта"
+  },
+  "state": {
+    "prefix": "state",
+    "body": ["state(\"${1:StName}\", {move: \"${2|none,move,follow,attack|}\", takeAllItem: false});"],
+    "description": "Состояние группы — её поведение"
+  },
+  "state (с диалогом и кодом)": {
+    "prefix": "statefull",
+    "body": [
+      "state(\"${1:StGreeter}\", {move: \"none\", takeAllItem: false, onTalk: \"${2:dGreet}\", code: function() {",
+      "    $0",
+      "}});"
+    ],
+    "description": "Состояние с диалогом при разговоре и кодом каждый ход"
+  },
+  "dialog": {
+    "prefix": "dialog",
+    "body": [
+      "dialog(\"${1:dGreet}\", {code: function() {",
+      "    DChange(${2:0});   // показать N-ю dialogMsg (нумерация по объявлению, с нуля)",
+      "    exit;",
+      "}});"
+    ],
+    "description": "Вход в диалог и маршрутизация реплик"
+  },
+  "dialogMsg": {
+    "prefix": "dialogMsg",
+    "body": [
+      "dialogMsg(\"${1:MsgHello}\", {text: \"${2:Текст реплики}\", code: function() {",
+      "    DAdd(${3:0});   // добавить N-й dialogAnswer",
+      "}});"
+    ],
+    "description": "Реплика NPC. Текст пишется ТОЛЬКО в text: — DText(CT(...)) в code: портит rsmc"
+  },
+  "dialogAnswer": {
+    "prefix": "dialogAnswer",
+    "body": ["dialogAnswer(\"${1:AnsBye}\", {text: \"${2:До связи!}\", answerCommand: \"${3|exit,fastexit|}\"});"],
+    "description": "Ответ игрока; answerCommand закрывает диалог"
+  },
+  "dialogAnswer (переход)": {
+    "prefix": "dialogAnswernext",
+    "body": ["dialogAnswer(\"${1:AnsMore}\", {text: \"${2:Расскажи ещё}\", next: \"${3:MsgAgain}\"});"],
+    "description": "Ответ игрока с переходом к другой реплике"
+  },
+  "onInit": {
+    "prefix": "onInit",
+    "body": ["export function onInit() {", "  $0", "}"],
+    "description": "Вызывается при старте скрипта в новой игре"
+  },
+  "onTurn": {
+    "prefix": "onTurn",
+    "body": ["export function onTurn() {", "  $0", "}"],
+    "description": "Вызывается каждый игровой ход"
+  },
+  "onDialogBegin": {
+    "prefix": "onDialogBegin",
+    "body": ["export function onDialogBegin() {", "  $0", "}"],
+    "description": "Вызывается при открытии диалога этого скрипта"
+  },
+  "onGlobal": {
+    "prefix": "onGlobal",
+    "body": ["export function onGlobal() {", "  $0", "}"],
+    "description": "Вызывается каждый ход независимо от состояния скрипта"
+  },
+  "function": {
+    "prefix": "function",
+    "body": ["function ${1:name}() {", "  $0", "}"],
+    "description": "Своя функция скрипта"
+  },
+  "if": {
+    "prefix": "if",
+    "body": ["if(${1:cond}) {", "  $0", "}"],
+    "description": "Условие"
+  },
+  "ifelse": {
+    "prefix": "ifelse",
+    "body": ["if(${1:cond}) {", "  $2", "} else {", "  $0", "}"],
+    "description": "Условие с веткой else"
+  },
+  "while": {
+    "prefix": "while",
+    "body": ["while(${1:cond}) {", "  $0", "}"],
+    "description": "Цикл"
+  },
+  "for": {
+    "prefix": "for",
+    "body": ["for(int ${1:i} = 0; ${1:i} < ${2:10}; ${1:i} = ${1:i} + 1) {", "  $0", "}"],
+    "description": "Цикл со счётчиком"
+  },
+  "CT": {
+    "prefix": "CT",
+    "body": ["CT(\"${1:MyModExtra}.${2:hint}\")"],
+    "description": "Взять текст из Lang.dat по ключу раздел.ключ"
+  }
+}

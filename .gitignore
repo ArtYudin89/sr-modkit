@@ -12,3 +12,10 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# Расширение VS Code. Сгенерированные копии (extension/syntaxes, extension/data,
+# extension/LICENSE, иконка) в git ЛЕЖАТ — как и канон в корне: иначе свежий
+# клон не запустится по F5 без tools/sync_extension.py. Не для git — только
+# зависимости и собранный пакет.
+node_modules/
+*.vsix

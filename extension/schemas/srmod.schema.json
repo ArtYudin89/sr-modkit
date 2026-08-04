@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "srmod.json — описание мода для Space Rangers HD",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+      "description": "Имя мода. Оно же scriptName в .rsm, имя .scr и префикс ключей текстов — везде должно совпадать."
+    },
+    "install": {
+      "type": "string",
+      "description": "Путь установки от корня игры, например Mods/Artem/MyMod. От него зависят CacheData.dat и INSTALL.TXT."
+    },
+    "languages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Языки мода — папки в CFG/ (Rus, Eng, …).",
+      "default": ["Rus"]
+    },
+    "primary_lang": {
+      "type": "string",
+      "description": "Основной язык: только в его Lang.dat rsmc кладёт перекеченные тексты диалогов.",
+      "default": "Rus"
+    },
+    "script": {
+      "type": "object",
+      "description": "Чем собирать скрипт.",
+      "properties": {
+        "engine": {
+          "type": "string",
+          "enum": ["rsmc", "scr", "none"],
+          "description": "rsmc — собирать .rsm компилятором; scr — класть готовый бинарный .scr как есть (для чужих модов, которые не пересобираются байт-в-байт); none — мод без скрипта.",
+          "default": "rsmc"
+        },
+        "entry": {
+          "type": "string",
+          "description": "Точка входа относительно папки мода, например src/DATA/Script/MyMod.src/main.rsm"
+        }
+      },
+      "additionalProperties": false
+    },
+    "lang": {
+      "type": "object",
+      "properties": {
+        "merge_into": {
+          "type": "string",
+          "enum": ["txt", "dat"],
+          "description": "Куда rsmc сливает таблицу текстов: во временный txt (по умолчанию) или прямо в .dat.",
+          "default": "txt"
+        }
+      },
+      "additionalProperties": false
+    },
+    "media": {
+      "type": "object",
+      "description": "Форматы кодирования картинок. Отдельным файлам формат можно задать сайдкаром <имя>.gi.json.",
+      "properties": {
+        "gi_format": { "type": "string", "default": "argb" },
+        "gai_format": { "type": "string", "default": "delta" }
+      },
+      "additionalProperties": false
+    },
+    "packages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Пути к папкам *.pkg.src (от src/). Каждая пакуется в .pkg."
+    },
+    "install_txt": {
+      "type": "boolean",
+      "default": true,
+      "description": "Генерировать ли build/INSTALL.TXT со списком пакетов. Ставится false, если оригинальный мод его не вёз."
+    },
+    "deploy": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "Как ставить мод в игру. junction — символическая ссылка <игра>/<install> на build/.",
+          "default": "junction"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
