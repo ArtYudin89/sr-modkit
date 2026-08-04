@@ -89,9 +89,9 @@ def _sniff_encoding(data):
 
 
 def check_source_encodings(root):
-    """Обойти мод и проверить кодировки: ModuleInfo.txt/*.txt (датники) — только
-    UTF-16LE+BOM; *.rsm — UTF-8. Возвращает список строк-проблем (пусто = ок)."""
-    root = Path(root)
+    """Обойти src/ мода и проверить кодировки: ModuleInfo.txt/*.txt (датники) —
+    только UTF-16LE+BOM; *.rsm — UTF-8. Возвращает список строк-проблем."""
+    root = Path(root) / 'src'
     problems = []
 
     mi = root / 'ModuleInfo.txt'

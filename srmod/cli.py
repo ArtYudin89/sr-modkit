@@ -11,6 +11,9 @@ from . import lint as lintmod
 from . import watch as watchmod
 from . import importer as importermod
 from . import verify as verifymod
+from . import deploy as deploymod
+from . import opener as openermod
+from . import rebuild as rebuildmod
 
 
 def _tool_cli_overrides(args):
@@ -39,13 +42,21 @@ def build_parser():
     p_doctor.add_argument('project', nargs='?', help='каталог мода (по умолчанию cwd)')
     _add_tool_flags(p_doctor)
 
-    p_build = sub.add_parser('build', help='собрать мод: медиа -> язык -> rsmc -> dat -> pkg')
+    p_build = sub.add_parser('build', help='собрать мод: src/ -> build/ (game-ready)')
     p_build.add_argument('project', nargs='?', help='каталог мода (по умолчанию cwd)')
+    p_build.add_argument('--deploy', action='store_true',
+                         help='после сборки поставить junction <игра>\\<install> -> build/')
     _add_tool_flags(p_build)
 
-    p_new = sub.add_parser('new', help='скаффолд минимального мода')
+    p_deploy = sub.add_parser('deploy', help='junction <игра>\\<install> -> build/')
+    p_deploy.add_argument('project', nargs='?', help='каталог мода (по умолчанию cwd)')
+    _add_tool_flags(p_deploy)
+
+    p_new = sub.add_parser('new', help='скаффолд мода (богатый шаблон с комментариями и медиа)')
     p_new.add_argument('dest', help='каталог для нового мода')
     p_new.add_argument('--name', required=True, help='имя мода (scriptName/имя .scr)')
+    p_new.add_argument('--minimal', action='store_true',
+                       help='голый скаффолд без комментариев/диалогов/медиа')
     p_new.add_argument('--install', help='путь установки от корня игры (по умолчанию Mods/Artem/<name>)')
     p_new.add_argument('--primary-lang', default='Rus')
     p_new.add_argument('--lang', dest='languages', action='append',
@@ -69,10 +80,24 @@ def build_parser():
                           help='не сохранять <Name>.import.rson (нужен для verify --gate)')
     _add_tool_flags(p_import)
 
-    p_verify = sub.add_parser('verify', help='гейт доверия rsmc vs rson для импортированного мода')
+    p_verify = sub.add_parser('verify', help='гейты доверия: rsmc vs rson (--gate), пересборка vs оригинал (--rebuild)')
     p_verify.add_argument('project', nargs='?', help='каталог мода (по умолчанию cwd)')
-    p_verify.add_argument('--gate', action='store_true', help='(зарезервировано — сейчас единственный режим)')
+    p_verify.add_argument('--gate', action='store_true', help='сборка обеими ветками и сравнение (по умолчанию)')
+    p_verify.add_argument('--rebuild', metavar='ORIGINAL_DIR',
+                          help='собрать и сравнить build/ с оригинальным компилированным модом')
     _add_tool_flags(p_verify)
+
+    p_open = sub.add_parser('open', help='этап C: разобрать компилированный мод в проект src/')
+    p_open.add_argument('mod_dir', help='каталог компилированного мода (как в Mods\\ игры)')
+    p_open.add_argument('dest', help='каталог нового проекта')
+    p_open.add_argument('--name', help='имя скрипта (по умолчанию — стем единственного .scr)')
+    p_open.add_argument('--install', help='путь установки от корня игры (по умолчанию — из CacheData)')
+    p_open.add_argument('--force', action='store_true', help='разбирать даже в непустой каталог')
+    p_open.add_argument('--pkg-limit', type=int, default=64, metavar='MB',
+                        help='pkg больше лимита не разворачивать в .pkg.src/ (по умолчанию 64 МБ)')
+    p_open.add_argument('--verify', action='store_true',
+                        help='после открытия собрать и сверить с оригиналом (гейт пересборки)')
+    _add_tool_flags(p_open)
 
     return p
 
@@ -91,6 +116,18 @@ def main(argv=None):
         cfg = configmod.Config(project_dir=getattr(args, 'project', None), cli_tools=cli_tools)
         try:
             buildmod.build(cfg)
+            if args.deploy:
+                deploymod.deploy(cfg)
+        except buildmod.BuildError as e:
+            print(f'error: {e}', file=sys.stderr)
+            return 1
+        return 0
+
+    if args.command == 'deploy':
+        cli_tools = _tool_cli_overrides(args)
+        cfg = configmod.Config(project_dir=getattr(args, 'project', None), cli_tools=cli_tools)
+        try:
+            deploymod.deploy(cfg)
         except buildmod.BuildError as e:
             print(f'error: {e}', file=sys.stderr)
             return 1
@@ -101,7 +138,7 @@ def main(argv=None):
         try:
             dest = newmod.scaffold(args.dest, args.name, install=args.install,
                                    primary_lang=args.primary_lang, languages=languages,
-                                   force=args.force)
+                                   force=args.force, minimal=args.minimal)
         except buildmod.BuildError as e:
             print(f'error: {e}', file=sys.stderr)
             return 1
@@ -136,10 +173,29 @@ def main(argv=None):
         cli_tools = _tool_cli_overrides(args)
         cfg = configmod.Config(project_dir=getattr(args, 'project', None), cli_tools=cli_tools)
         try:
+            if args.rebuild:
+                return rebuildmod.verify_rebuild(cfg, args.rebuild)
             return verifymod.verify_gate(cfg)
         except buildmod.BuildError as e:
             print(f'error: {e}', file=sys.stderr)
             return 1
+
+    if args.command == 'open':
+        cli_tools = _tool_cli_overrides(args)
+        cfg = configmod.Config(project_dir=args.dest, cli_tools=cli_tools)
+        try:
+            dest, report = openermod.open_mod(cfg, args.mod_dir, args.dest,
+                                              name=args.name, install=args.install,
+                                              force=args.force,
+                                              pkg_limit_mb=args.pkg_limit)
+            openermod.print_report(dest, report)
+            if args.verify:
+                cfg2 = configmod.Config(project_dir=str(dest), cli_tools=cli_tools)
+                return rebuildmod.verify_rebuild(cfg2, args.mod_dir)
+        except buildmod.BuildError as e:
+            print(f'error: {e}', file=sys.stderr)
+            return 1
+        return 0
 
     parser.print_help()
     return 2

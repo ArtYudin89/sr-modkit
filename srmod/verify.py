@@ -90,8 +90,7 @@ def verify_gate(cfg):
     name = cfg.project.get('name')
     if not name:
         raise BuildError('srmod.json без "name"')
-    root = cfg.root
-    rson_path = root / 'DATA' / 'Script' / f'{name}.import.rson'
+    rson_path = cfg.src_dir / 'DATA' / 'Script' / f'{name}.import.rson'
     if not rson_path.exists():
         print(f'gate неприменим: {rson_path.name} не найден (мод не импортирован '
               f'`srmod import` — сравнивать нечего)')

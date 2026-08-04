@@ -30,6 +30,10 @@ DEFAULT_PROJECT = {
     'lang': {'merge_into': 'txt'},
     'media': {'gi_format': 'argb', 'gai_format': 'delta'},
     'packages': [],
+    # Генерировать ли build/INSTALL.TXT из packages. srmod open ставит False,
+    # если оригинальный мод его не шипил (напр. INSTALL_RUSSIAN/ENGLISH.TXT
+    # на выбор игрока — SR2RebootMenu).
+    'install_txt': True,
     'deploy': {'mode': 'junction'},
 }
 
@@ -157,6 +161,17 @@ class Config:
         if self.project.get('_path'):
             return Path(self.project['_path']).parent
         return Path.cwd()
+
+    # Раскладка src/build (решение юзера 2026-08-04): исходники целиком в
+    # src/, сборка целиком в build/ — game-ready дерево, которое кладётся
+    # (junction'ом) в Mods\ как есть, без исходников и комментариев.
+    @property
+    def src_dir(self):
+        return self.root / 'src'
+
+    @property
+    def build_dir(self):
+        return self.root / 'build'
 
     def tool(self, key):
         return self.tools.get(key)

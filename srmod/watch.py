@@ -10,33 +10,22 @@ import json
 import time
 from pathlib import Path
 
-# Источники, за которыми следим — расширения покрывают [S] из раскладки (а).
-_SOURCE_GLOBS = ('*.rsm', '*.txt', '*.json', '*.png', 'ModuleInfo.txt')
-
-# Артефакты [A] — та же граница, что .gitignore в docs/STAGE0.md (а). Нужны
-# отдельно от _SOURCE_GLOBS: DATA/Script/*.txt (таблица CT-ключей) rsmc
-# переписывает КАЖДУЮ сборку, попади он в хэш — watch никогда не сойдётся
-# (видит "изменилось" сразу после своей же сборки, зацикливается).
-_ARTIFACT_PATTERNS = ('DATA/Script/*.txt', 'CFG/CacheData.txt', 'INSTALL.TXT')
-
+# Раскладка src/build сняла старую граблю «rsmc пишет артефакт рядом с
+# исходником, watch ловит его как изменение и зацикливается»: артефакты
+# теперь живут только в build/, а исходники — только в src/. Следим за всем
+# src/ (что бы там ни лежало — это по определению исходник) плюс srmod.json.
 _STATE_REL = Path('.srmod') / 'state.json'
 
 
-def _is_artifact(root, path):
-    rel = path.relative_to(root)
-    return any(rel.match(pat) for pat in _ARTIFACT_PATTERNS)
-
-
 def _iter_sources(root):
-    seen = set()
-    for pattern in _SOURCE_GLOBS:
-        for p in root.rglob(pattern):
-            if '.srmod' in p.parts:
-                continue
-            if p in seen or _is_artifact(root, p):
-                continue
-            seen.add(p)
-            yield p
+    src = root / 'src'
+    if src.is_dir():
+        for p in src.rglob('*'):
+            if p.is_file():
+                yield p
+    project = root / 'srmod.json'
+    if project.exists():
+        yield project
 
 
 def hash_sources(root):

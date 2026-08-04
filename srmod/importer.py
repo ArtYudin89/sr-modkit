@@ -33,8 +33,7 @@ def import_rson(cfg, rson_path, name=None, keep_source=True):
     import run as decomp_run  # noqa: E402
 
     name = name or rson_path.stem
-    root = cfg.root
-    script_dir = root / 'DATA' / 'Script'
+    script_dir = cfg.src_dir / 'DATA' / 'Script'
     script_dir.mkdir(parents=True, exist_ok=True)
     out_rsm_arg = script_dir / f'{name}.src.rsm'  # -> каталог "<name>.src" (см. докстринг)
 
@@ -42,6 +41,8 @@ def import_rson(cfg, rson_path, name=None, keep_source=True):
     if not ok:
         raise BuildError(f'экспорт в .rsm провалился: {msg}')
     src_dir = Path(msg)
+    from .opener import strip_rsm_bom
+    strip_rsm_bom(src_dir)
 
     kept_rson = None
     if keep_source:

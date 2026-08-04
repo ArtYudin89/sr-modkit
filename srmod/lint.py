@@ -1,7 +1,12 @@
 """`srmod lint` — статические проверки .rsm на грабли rsmc из docs/STAGE0.md (б):
 
-1. `DText(...)` внутри `code:` у `dialogMsg` молча выбрасывается rsmc (текст
-   диалога живёт только в `text:`) — не ошибка сборки, просто немой текст.
+1. `DText(...)` внутри `code:` у `dialogMsg`. rsmc его НЕ выбрасывает, но
+   (сверено побайтово и через RScript --cli -d, 2026-08-04): строковый литерал
+   внутри CT(...) перекеивается как ТЕКСТ, получается двойной лукап
+   `DText(CT(CT("Script.X.M")))`, а из text: (даже пустого) генерится ещё один
+   DText первым оператором. Работает это только пока таблица rsmc не слита в ту
+   же секцию Lang (перетрёт оригинальные ключи) — для авторского мода текст
+   должен жить в text:, для импортированного — сборка rson-веткой.
 2. `state("12", ...)` — цифровое имя состояния: `ChangeState(<число>)`
    резолвится ПО ИМЕНИ, если состояние с таким именем существует, и такое имя
    молча подменяет резолв по индексу (проверено на `Mod_RevDiplomat`).
@@ -51,8 +56,9 @@ def lint_rsm_text(path, text):
             if dt:
                 line = _line_of(text, m.start() + code_m.end() - 1 + dt.start())
                 problems.append((line,
-                                 f'dialogMsg("{dmsg_name}"): DText(...) внутри code: '
-                                 f'молча выбрасывается rsmc — текст берётся только из text:'))
+                                 f'dialogMsg("{dmsg_name}"): DText(...) внутри code: — rsmc '
+                                 f'перекеит CT-аргумент как текст (двойной CT(CT(...))) и '
+                                 f'добавит лишний DText из text:; текст пишите в text:'))
     for m in _DECL_DIGIT_RE.finditer(text):
         problems.append((_line_of(text, m.start()),
                          f'state("{m.group(1)}"): цифровое имя — ChangeState({m.group(1)}) '
@@ -62,8 +68,7 @@ def lint_rsm_text(path, text):
 
 def lint_project(cfg):
     """Возвращает список (path, line, message). Пусто = чисто."""
-    root = cfg.root
-    script_dir = root / 'DATA' / 'Script'
+    script_dir = cfg.src_dir / 'DATA' / 'Script'
     all_problems = []
     if script_dir.is_dir():
         for rsm in sorted(script_dir.rglob('*.rsm')):
