@@ -15,6 +15,8 @@ const vscode = require('vscode');
 const runner = require('./runner');
 const project = require('./project');
 const dsl = require('./dsl');
+const lexicon = require('./lexicon');
+const definition = require('./definition');
 
 let output;
 let diagnostics;
@@ -90,7 +92,9 @@ function reportResult(result, okMessage) {
 
 // --------------------------------------------------------------------- lint
 
-const LINT_LINE = /^(.+?):(\d+):\s*(.*)$/;
+// `путь:строка: важность: текст` — важность появилась вместе со сверкой по
+// rsm-dsl.json и необязательна: строки без неё остаются предупреждениями.
+const LINT_LINE = /^(.+?):(\d+):\s*(?:(error|warning):\s*)?(.*)$/;
 
 function applyLint(projectDir, lines) {
     const byFile = new Map();
@@ -103,7 +107,10 @@ function applyLint(projectDir, lines) {
         const uri = vscode.Uri.file(file);
         const lineNo = Math.max(0, parseInt(m[2], 10) - 1);
         const range = new vscode.Range(lineNo, 0, lineNo, Number.MAX_SAFE_INTEGER);
-        const diag = new vscode.Diagnostic(range, m[3], vscode.DiagnosticSeverity.Warning);
+        const severity = m[3] === 'error'
+            ? vscode.DiagnosticSeverity.Error
+            : vscode.DiagnosticSeverity.Warning;
+        const diag = new vscode.Diagnostic(range, m[4], severity);
         diag.source = 'srmod lint';
         const key = uri.toString();
         if (!byFile.has(key)) {
@@ -398,6 +405,13 @@ function activate(context) {
         vscode.languages.registerCompletionItemProvider(
             'rangers-script', dsl.completionProvider(context), '.', ':', '"', "'", '{', ','),
         vscode.languages.registerHoverProvider('rangers-script', dsl.hoverProvider(context)),
+        // Встроенные функции движка (977 имён) — отдельным провайдером: dsl.js
+        // отвечает за декларации мода, lexicon.js — за то, что зовут в коде.
+        vscode.languages.registerCompletionItemProvider(
+            'rangers-script', lexicon.completionProvider(context)),
+        vscode.languages.registerHoverProvider('rangers-script', lexicon.hoverProvider(context)),
+        vscode.languages.registerDefinitionProvider(
+            'rangers-script', definition.definitionProvider(context)),
         vscode.tasks.registerTaskProvider('srmod', taskProvider(context)));
 
     context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (doc) => {

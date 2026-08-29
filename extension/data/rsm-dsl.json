@@ -22,7 +22,8 @@
         "constellation",
         "noKling",
         "noComeKling"
-      ]
+      ],
+      "strictFields": false
     },
     "planet": {
       "positional": [
@@ -51,6 +52,8 @@
             "Fei",
             "Gaal"
           ],
+          "kind": "flags",
+          "stringIgnored": true,
           "validated": true
         },
         "owner": {
@@ -66,6 +69,8 @@
             "Pirate",
             "ByPlayer"
           ],
+          "kind": "flags",
+          "stringIgnored": true,
           "validated": true
         },
         "economy": {
@@ -75,6 +80,8 @@
             "Industrial",
             "Mixed"
           ],
+          "kind": "flags",
+          "stringIgnored": true,
           "validated": true
         },
         "government": {
@@ -86,9 +93,12 @@
             "Republic",
             "Democracy"
           ],
+          "kind": "flags",
+          "stringIgnored": true,
           "validated": true
         }
-      }
+      },
+      "strictFields": false
     },
     "ship": {
       "positional": [],
@@ -129,6 +139,8 @@
             "Pirate",
             "ByPlayer"
           ],
+          "kind": "flags",
+          "stringIgnored": true,
           "validated": true
         },
         "type": {
@@ -166,9 +178,12 @@
             "Terron6",
             "Terron7"
           ],
+          "kind": "flags",
+          "stringIgnored": true,
           "validated": true
         }
-      }
+      },
+      "strictFields": false
     },
     "state": {
       "positional": [
@@ -208,9 +223,11 @@
             "landing",
             "free"
           ],
+          "kind": "scalar",
           "validated": true
         }
-      }
+      },
+      "strictFields": true
     },
     "group": {
       "positional": [
@@ -258,6 +275,8 @@
             "Pirate",
             "ByPlayer"
           ],
+          "kind": "flags",
+          "stringIgnored": true,
           "validated": true
         },
         "type": {
@@ -295,9 +314,12 @@
             "Terron6",
             "Terron7"
           ],
+          "kind": "flags",
+          "stringIgnored": true,
           "validated": true
         }
-      }
+      },
+      "strictFields": false
     },
     "place": {
       "positional": [
@@ -326,9 +348,11 @@
             "fromShip",
             "coords"
           ],
+          "kind": "scalar",
           "validated": true
         }
-      }
+      },
+      "strictFields": false
     },
     "item": {
       "positional": [
@@ -354,6 +378,7 @@
             "Useless",
             "Unknown"
           ],
+          "kind": "scalar",
           "validated": true
         },
         "owner": {
@@ -367,9 +392,11 @@
             "None",
             "PirateClan"
           ],
+          "kind": "scalar",
           "validated": true
         }
-      }
+      },
+      "strictFields": false
     },
     "ether": {
       "positional": [
@@ -382,7 +409,8 @@
       ],
       "required": [
         "msg"
-      ]
+      ],
+      "strictFields": false
     },
     "groupLink": {
       "positional": [
@@ -394,7 +422,8 @@
         "rel2",
         "warWeightMin",
         "warWeightMax"
-      ]
+      ],
+      "strictFields": false
     },
     "starLink": {
       "positional": [
@@ -405,7 +434,8 @@
         "distMin",
         "distMax",
         "hole"
-      ]
+      ],
+      "strictFields": false
     },
     "dialog": {
       "positional": [
@@ -417,7 +447,8 @@
       ],
       "codeFields": [
         "code"
-      ]
+      ],
+      "strictFields": true
     },
     "dialogMsg": {
       "positional": [
@@ -438,7 +469,8 @@
       },
       "codeFields": [
         "code"
-      ]
+      ],
+      "strictFields": true
     },
     "dialogAnswer": {
       "positional": [
@@ -461,11 +493,13 @@
             "shop",
             "hangar",
             "planet",
+            "block",
             "fastexit"
           ],
           "validated": false
         }
-      }
+      },
+      "strictFields": true
     },
     "globalVar": {
       "positional": [

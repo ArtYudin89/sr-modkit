@@ -13,9 +13,16 @@
 
 Оба факта добыты руками прогоном корпуса ([[project_scr_decompiler]]),
 здесь — только их статическое обнаружение, не переоткрытие.
+
+Поверх этого — проверки по машинному описанию языка (`srmod/dsl.py`,
+`data/rsm-dsl.json` из самого rsmc): неизвестные поля деклараций, отсутствие
+обязательных, негодные значения перечислений. Отключаются `--no-dsl`, если
+чужой мод пользуется тем, чего в описании нет.
 """
 import re
 from pathlib import Path
+
+from .dsl import ERROR, WARN, check_declarations
 
 _DIALOGMSG_RE = re.compile(r'dialogMsg\s*\(\s*"([^"]*)"\s*,\s*\{')
 _DECL_DIGIT_RE = re.compile(r'\bstate\s*\(\s*"(\d+)"')
@@ -39,13 +46,14 @@ def _line_of(text, pos):
     return text.count('\n', 0, pos) + 1
 
 
-def lint_rsm_text(path, text):
+def lint_rsm_text(path, text, use_dsl=True):
+    """-> [(line, severity, message)] (severity: 'ошибка' | 'внимание')."""
     problems = []
     for m in _DIALOGMSG_RE.finditer(text):
         dmsg_name = m.group(1)
         body = _extract_braced(text, m.end() - 1)
         if not body.endswith('}') or body.count('{') != body.count('}'):
-            problems.append((_line_of(text, m.start()),
+            problems.append((_line_of(text, m.start()), ERROR,
                              f'dialogMsg("{dmsg_name}"): не удалось сбалансировать {{}} '
                              f'(несбалансированные скобки rsmc тоже не парсит)'))
             continue
@@ -55,39 +63,45 @@ def lint_rsm_text(path, text):
             dt = _DTEXT_RE.search(code_body)
             if dt:
                 line = _line_of(text, m.start() + code_m.end() - 1 + dt.start())
-                problems.append((line,
+                problems.append((line, WARN,
                                  f'dialogMsg("{dmsg_name}"): DText(...) внутри code: — rsmc '
                                  f'перекеит CT-аргумент как текст (двойной CT(CT(...))) и '
                                  f'добавит лишний DText из text:; текст пишите в text:'))
     for m in _DECL_DIGIT_RE.finditer(text):
-        problems.append((_line_of(text, m.start()),
+        problems.append((_line_of(text, m.start()), WARN,
                          f'state("{m.group(1)}"): цифровое имя — ChangeState({m.group(1)}) '
                          f'после сборки резолвится по ИМЕНИ этого состояния, а не по индексу'))
+    if use_dsl:
+        problems.extend(check_declarations(text))
+    problems.sort(key=lambda p: p[0])
     return problems
 
 
-def lint_project(cfg):
-    """Возвращает список (path, line, message). Пусто = чисто."""
+def lint_project(cfg, use_dsl=True):
+    """Возвращает список (path, line, severity, message). Пусто = чисто."""
     script_dir = cfg.src_dir / 'DATA' / 'Script'
     all_problems = []
     if script_dir.is_dir():
         for rsm in sorted(script_dir.rglob('*.rsm')):
             text = rsm.read_text(encoding='utf-8', errors='replace')
-            for line, msg in lint_rsm_text(rsm, text):
-                all_problems.append((rsm, line, msg))
+            for line, severity, msg in lint_rsm_text(rsm, text, use_dsl=use_dsl):
+                all_problems.append((rsm, line, severity, msg))
     return all_problems
 
 
-def run_lint(cfg):
-    problems = lint_project(cfg)
+def run_lint(cfg, use_dsl=True):
+    problems = lint_project(cfg, use_dsl=use_dsl)
     if not problems:
         print('OK: замечаний нет')
         return 0
-    for path, line, msg in problems:
+    for path, line, severity, msg in problems:
         try:
             rel = path.relative_to(cfg.root)
         except ValueError:
             rel = path
-        print(f'{rel}:{line}: {msg}')
-    print(f'--- {len(problems)} замечание(й)')
+        # Формат строки — контракт с расширением (problemMatcher $srmod-lint):
+        # `путь:строка: важность: текст`.
+        print(f'{rel}:{line}: {severity}: {msg}')
+    errors = sum(1 for p in problems if p[2] == ERROR)
+    print(f'--- {len(problems)} замечание(й), из них ошибок: {errors}')
     return 1

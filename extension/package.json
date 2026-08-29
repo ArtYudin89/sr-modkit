@@ -2,7 +2,7 @@
   "name": "sr-modkit",
   "displayName": "SR Modkit — моды Space Rangers HD",
   "description": "Подсветка скриптов .rsm и команды srmod (собрать, поставить в игру, проверить) прямо в VS Code",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "artyudin89",
   "license": "GPL-3.0-or-later",
   "icon": "media/icon.png",
@@ -42,6 +42,23 @@
           ".rsm"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "rangers-dat",
+        "aliases": [
+          "Rangers Dat",
+          "blockpar"
+        ],
+        "filenames": [
+          "Lang.txt",
+          "Main.txt",
+          "CacheData.txt",
+          "ModuleInfo.txt"
+        ],
+        "filenamePatterns": [
+          "**/CFG/**/*.txt"
+        ],
+        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
@@ -49,6 +66,11 @@
         "language": "rangers-script",
         "scopeName": "source.rangers-script",
         "path": "./syntaxes/rangers-script.tmLanguage.json"
+      },
+      {
+        "language": "rangers-dat",
+        "scopeName": "source.rangers-dat",
+        "path": "./syntaxes/rangers-dat.tmLanguage.json"
       }
     ],
     "snippets": [
@@ -189,10 +211,11 @@
           "${workspaceFolder}"
         ],
         "pattern": {
-          "regexp": "^(.+?):(\\d+):\\s+(.*)$",
+          "regexp": "^(.+?):(\\d+):\\s+(error|warning):\\s+(.*)$",
           "file": 1,
           "line": 2,
-          "message": 3
+          "severity": 3,
+          "message": 4
         }
       }
     ],

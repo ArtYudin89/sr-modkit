@@ -11,6 +11,7 @@
 """
 import argparse
 import io
+import json
 import os
 import shutil
 import struct
@@ -28,10 +29,48 @@ if hasattr(sys.stdout, 'reconfigure'):
 COPIES = [
     (os.path.join('syntaxes', 'rangers-script.tmLanguage.json'),
      os.path.join('syntaxes', 'rangers-script.tmLanguage.json')),
+    (os.path.join('syntaxes', 'rangers-dat.tmLanguage.json'),
+     os.path.join('syntaxes', 'rangers-dat.tmLanguage.json')),
     (os.path.join('data', 'rsm-dsl.json'),
      os.path.join('data', 'rsm-dsl.json')),
     ('LICENSE', 'LICENSE'),
 ]
+
+
+def make_lexicon():
+    """data/lexicon.json (977 записей, ~940 КБ) -> extension/data/lexicon.json.
+
+    В расширении нужны только имя, вид, арность и короткое описание: полные
+    примечания из мануала весят почти всё и в подсказке всё равно не помещаются.
+    """
+    src = os.path.join(ROOT, 'data', 'lexicon.json')
+    if not os.path.exists(src):
+        raise SystemExit('нет %s — сначала python tools/build_lexicon.py' % src)
+    with io.open(src, encoding='utf-8') as fh:
+        data = json.load(fh)
+    out = {}
+    for name, entry in data.get('entries', {}).items():
+        sig = entry.get('signature') or {}
+        item = {'kind': entry.get('kind', 'function')}
+        if entry.get('summary'):
+            item['summary'] = entry['summary'][:400]
+        params = [p.get('description', '')[:60] for p in (entry.get('params') or [])]
+        if params:
+            item['params'] = params
+        if sig.get('min') is not None:
+            item['min'] = sig['min']
+        if sig.get('max') is not None:
+            item['max'] = sig['max']
+        out[name] = item
+    dst = os.path.join(EXT, 'data', 'lexicon.json')
+    dst_dir = os.path.dirname(dst)
+    if not os.path.isdir(dst_dir):
+        os.makedirs(dst_dir)
+    with io.open(dst, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(json.dumps({'entries': out}, ensure_ascii=False,
+                            separators=(',', ':')) + '\n')
+    print('  data/lexicon.json -> extension/data/lexicon.json (%d записей, %d Б)'
+          % (len(out), os.path.getsize(dst)))
 
 
 def regen():
@@ -113,6 +152,7 @@ def main():
         regen()
     print('== копирование в extension/')
     copy_all()
+    make_lexicon()
     make_icon(force=args.icon)
 
 

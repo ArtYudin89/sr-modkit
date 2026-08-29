@@ -18,9 +18,15 @@ class MarkdownString { constructor(v) { this.value = v; } }
 class SnippetString { constructor(v) { this.value = v; } }
 class Hover { constructor(c, r) { this.contents = c; this.range = r; } }
 
+class Location { constructor(uri, pos) { this.uri = uri; this.range = pos; } }
+
 const fakeVscode = {
-    Position, Range, CompletionItem, MarkdownString, SnippetString, Hover,
-    CompletionItemKind: { EnumMember: 'enum', Property: 'prop', Function: 'fn' },
+    Position, Range, CompletionItem, MarkdownString, SnippetString, Hover, Location,
+    CompletionItemKind: {
+        EnumMember: 'enum', Property: 'prop', Function: 'fn',
+        Constant: 'const', Keyword: 'kw',
+    },
+    Uri: { file: (p) => ({ fsPath: p, toString: () => `file://${p}` }) },
 };
 
 const origLoad = Module._load;
@@ -154,6 +160,86 @@ check('hover по полю внутри декларации', () => {
     const text = 'planet("P", {government: "Anarchy"});';
     const h = hover.provideHover(doc(text), new Position(0, 16));
     assert.ok(h && /Democracy/.test(h.contents.value), JSON.stringify(h && h.contents));
+});
+
+console.log('== форма флаговых полей');
+check('флаговое поле вставляется массивом', () => {
+    const items = provider.provideCompletionItems(
+        doc('planet("P", {'), new Position(0, 'planet("P", {'.length));
+    const race = items.find((i) => i.label === 'race');
+    assert.ok(race && /\["\$0"\]/.test(race.insertText.value),
+        'race должен вставляться массивом: ' + (race && race.insertText.value));
+    const rangeMin = items.find((i) => i.label === 'rangeMin');
+    assert.ok(!/\[/.test(rangeMin.insertText.value), rangeMin.insertText.value);
+});
+check('hover флагового поля предупреждает про потерю строки', () => {
+    const text = 'planet("P", {race: ["Maloc"]});';
+    const h = hover.provideHover(doc(text), new Position(0, 15));
+    assert.ok(h && /только массивом/.test(h.contents.value), JSON.stringify(h && h.contents));
+});
+
+console.log('== сниппеты против схемы');
+// Списки значений в сниппетах писались раньше схемы и разъезжались с ней
+// (в place были выдуманные inSpace/nearStar) — теперь это ловит тест.
+const snippets = require(path.join(EXT, 'snippets', 'rangers-script.json'));
+const schema = dsl.load(context);
+for (const [name, snip] of Object.entries(snippets)) {
+    const decl = schema.declarations[name];
+    if (!decl || !decl.enums) { continue; }
+    const body = [].concat(snip.body).join('\n');
+    const rx = /([A-Za-z_][A-Za-z0-9_]*):\s*\\?"?\$\{\d+\|([^|]+)\|\}/g;
+    let m;
+    while ((m = rx.exec(body))) {
+        const [, field, choices] = m;
+        const en = decl.enums[field];
+        if (!en) { continue; }
+        check(`${name}.${field}: значения сниппета есть в схеме`, () => {
+            const bad = choices.split(',').map((s) => s.trim())
+                .filter((v) => !en.values.includes(v));
+            assert.deepStrictEqual(bad, [], `нет в схеме: ${bad.join(', ')}`);
+        });
+    }
+}
+
+console.log('== встроенные функции (lexicon)');
+const lexicon = require(path.join(EXT, 'src', 'lexicon.js'));
+const lexComplete = lexicon.completionProvider(context);
+check('ChangeState есть в лексиконе с описанием', () => {
+    const entry = lexicon.load(context).ChangeState;
+    assert.ok(entry && /state|стэйт/i.test(entry.summary || ''), JSON.stringify(entry));
+    assert.strictEqual(entry.min, 1);
+});
+check('функции подсказываются в теле function', () => {
+    const text = 'state("S", {code: function() {\n    Change';
+    const lines = text.split('\n');
+    const items = lexComplete.provideCompletionItems(
+        doc(text), new Position(lines.length - 1, lines[lines.length - 1].length));
+    assert.ok(labels(items).includes('ChangeState'), 'нет ChangeState');
+    assert.ok(items.length > 500, 'подозрительно мало: ' + items.length);
+});
+check('внутри строки функций не предлагаем', () => {
+    const text = 'state("S", {move: "no';
+    const items = lexComplete.provideCompletionItems(doc(text), new Position(0, text.length));
+    assert.deepStrictEqual(items, []);
+});
+check('hover по встроенной функции', () => {
+    const text = '    ChangeState("St1");';
+    const h = lexicon.hoverProvider(context).provideHover(doc(text), new Position(0, 8));
+    assert.ok(h && /ChangeState/.test(h.contents.value), JSON.stringify(h));
+});
+
+console.log('== переход к определению');
+const definition = require(path.join(EXT, 'src', 'definition.js'));
+check('строковый литерал -> декларация с этим именем', () => {
+    const text = 'state("StGreeter", {move: "none"});\nChangeState("StGreeter");';
+    const found = definition.declarationsIn(text, new Set(['state', 'planet']));
+    assert.deepStrictEqual(found.map((d) => [d.decl, d.name, d.line]),
+        [['state', 'StGreeter', 0]]);
+});
+check('вызов внутри кода за декларацию не считается', () => {
+    const text = 'state("A", {code: function() {\n    Trace("planet");\n}});';
+    const found = definition.declarationsIn(text, new Set(['state', 'planet']));
+    assert.deepStrictEqual(found.map((d) => d.name), ['A']);
 });
 
 console.log(failures ? `\nПРОВАЛОВ: ${failures}` : '\nвсё зелёное');

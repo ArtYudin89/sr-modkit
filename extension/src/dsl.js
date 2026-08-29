@@ -130,6 +130,14 @@ function fieldDoc(context, declName, field) {
     }
     const en = enumFor(context, declName, field);
     if (en) {
+        if (en.kind === 'flags') {
+            // Форма важнее значения: голую строку rsmc в этих полях глотает
+            // молча и теряет — проверено байтами (см. data/rsm-dsl.json).
+            lines.push(en.stringIgnored
+                ? `Набор флагов — **только массивом**: \`${field}: ["${en.values[1] || en.values[0]}"]\`. `
+                  + 'Голую строку rsmc принимает молча и ТЕРЯЕТ значение.'
+                : `Набор флагов — пишется массивом: \`${field}: ["${en.values[1] || en.values[0]}"]\`.`);
+        }
         lines.push(en.validated
             ? 'Допустимые значения (проверяет rsmc):'
             : 'Встречающиеся значения (rsmc это поле НЕ проверяет — опечатка соберётся молча):');
@@ -200,12 +208,16 @@ function completionProvider(context) {
                 const decl = data.declarations[declName];
                 if (decl) {
                     return decl.fields.map((field) => {
+                        const en = (decl.enums || {})[field];
+                        let snippet = `${field}: $0`;
+                        if ((decl.codeFields || []).includes(field)) {
+                            snippet = `${field}: function() {\n    $0\n}`;
+                        } else if (en && en.kind === 'flags') {
+                            snippet = `${field}: ["$0"]`;   // строкой rsmc теряет значение
+                        }
                         const item = new vscode.CompletionItem(
                             field, vscode.CompletionItemKind.Property);
-                        item.insertText = new vscode.SnippetString(
-                            (decl.codeFields || []).includes(field)
-                                ? `${field}: function() {\n    $0\n}`
-                                : `${field}: $0`);
+                        item.insertText = new vscode.SnippetString(snippet);
                         if ((decl.required || []).includes(field)) {
                             item.detail = 'обязательное';
                             item.sortText = `0${field}`;
@@ -263,4 +275,4 @@ function hoverProvider(context) {
     };
 }
 
-module.exports = { load, completionProvider, hoverProvider, mask, enclosingDecl };
+module.exports = { load, completionProvider, hoverProvider, mask, enclosingDecl, openQuote };

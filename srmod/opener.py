@@ -112,18 +112,47 @@ def derive_install_from_cachedata(cache_text, name):
     return None
 
 
-def make_cachedata_source(cache_text, install, name):
+def _points_at_own_scr(line, own_stems, install):
+    """Ведёт ли запись CacheData на скрипт ЭТОГО мода: путь внутри каталога
+    установки и имя файла — одно из наших. Den_DatVersion переопределяет
+    скрипты самой игры (`ms_begin`…) — там путь чужой, и такие записи наши."""
+    value = line.split('=', 1)[1].strip().replace('/', '\\')
+    stem = value.rsplit('\\', 1)[-1]
+    if not stem.lower().endswith('.scr') or stem[:-4].lower() not in own_stems:
+        return False
+    if not install:
+        return True
+    prefix = install.replace('/', '\\').rstrip('\\').lower() + '\\'
+    return value.lower().startswith(prefix)
+
+
+def make_cachedata_source(cache_text, install, names):
     """Вырезать секцию Script, подставить $INSTALL$ вместо префикса установки.
-    Возвращает (текст исходника | None, [предупреждения])."""
+    Возвращает (текст исходника | None, [предупреждения]).
+
+    names — все скрипты мода: секцию Script build генерирует сам по этому
+    списку, а вот запись о скрипте, которого в списке нет, потерялась бы молча
+    (так было до поддержки мультискрипта) — о ней предупреждаем.
+    """
     warnings = []
+    known = {names} if isinstance(names, str) else set(names)
     kept = []
     for sec_name, chunk in split_top_sections(cache_text):
         if sec_name == 'Script':
+            # Записи о СВОИХ скриптах генерирует build (пути зависят от install),
+            # а всё остальное в этой секции — авторские ссылки на чужие скрипты
+            # (Den_DatVersion переопределяет скрипты самой игры: ms_begin,
+            # ms_blazer…). Их сохраняем как есть.
+            # «Своя» запись — та, что ВЕДЁТ на наш .scr: ключ с именем скрипта
+            # не совпадает (SR2Dominators: `MS_Begin_Legacy=…\MS_Begin.scr`,
+            # Cat_Tardis: `Tardis=…\cat_tardis.scr`), и фильтр по ключу оставил
+            # бы её в исходнике — а build генерит такую же, и они бы задвоились.
+            own_stems = {n.lower() for n in known}
             extra = [ln for ln in chunk.splitlines()
-                     if '=' in ln and ln.split('=')[0].strip() != name]
+                     if '=' in ln and ln.split('=')[0].strip() not in known
+                     and not _points_at_own_scr(ln, own_stems, install)]
             if extra:
-                warnings.append(f'CacheData: в секции Script есть чужие записи '
-                                f'(мультискрипт?) — потеряны: {extra}')
+                kept.append('Script ^{\n' + '\n'.join(extra) + '\n}\n')
             continue
         kept.append(chunk)
     if not kept:
@@ -295,6 +324,15 @@ def open_media_file(cfg_media, run_py, srgi, src_file, dst_dir_for_file, rel, st
     gi_fmt = cfg_media.get('gi_format', 'argb')
     gai_fmt = cfg_media.get('gai_format', 'delta')
     if low.endswith('.gi'):
+        if (src_file.parent / (src_file.stem + '.png')).exists():
+            # Мод везёт и `X.gi`, и нативный `X.png` (TicTacToe: bg.gi + bg.png).
+            # Декодировать gi некуда — исходником стал бы тот же самый файл, и
+            # один из двух пропал бы из сборки. Оставляем gi бинарником.
+            dst_dir_for_file.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_file, dst_dir_for_file / src_file.name)
+            stats.kept_binary.append(
+                (rel, 'рядом лежит нативный .png с тем же именем'))
+            return True
         ok, why = try_decode_gi(srgi, src_file,
                                 dst_dir_for_file / (src_file.stem + '.png'), gi_fmt)
         kind = 'png'
@@ -379,17 +417,60 @@ def strip_rsm_bom(dir_path):
             f.write_bytes(data[3:])
 
 
-def _strip_lang_script_section(lang_txt_path):
-    """Убрать секцию Script из Lang-исходника (тексты переехали в .rsm)."""
+def _strip_lang_script_section(lang_txt_path, names=None):
+    """Убрать из Lang-исходника тексты скриптов, которые пересобирает rsmc.
+
+    names=None — вся секция Script (мод с единственным скриптом). Со списком
+    вырезаются только подблоки этих имён: у мультискриптового мода часть
+    скриптов может остаться бинарной (engine=scr), и их тексты — единственный
+    источник, трогать их нельзя.
+    """
     text, enc = _decode_datnik(lang_txt_path.read_bytes())
-    kept = [c for n, c in split_top_sections(text) if n != 'Script']
-    _encode_datnik(lang_txt_path, '\n'.join(kept).strip('\n') + '\n'
-                   if kept else '', enc)
+    if names is None:
+        kept = [c for n, c in split_top_sections(text) if n != 'Script']
+        out = '\n'.join(kept).strip('\n') + '\n' if kept else ''
+        _encode_datnik(lang_txt_path, out, enc)
+        return
+
+    names = set(names)
+    parts = []
+    for sec_name, chunk in split_top_sections(text):
+        if sec_name != 'Script':
+            parts.append(chunk)
+            continue
+        lines, depth, skip_until = [], 0, None
+        for line in chunk.splitlines():
+            s = line.strip()
+            m = re.match(r'^(\S+)\s*[\^~]\{$', s)
+            if m:
+                depth += 1
+                if skip_until is None and depth == 2 and m.group(1) in names:
+                    skip_until = depth
+                    continue
+            elif s == '}':
+                if skip_until is not None and depth == skip_until:
+                    depth -= 1
+                    skip_until = None
+                    continue
+                depth -= 1
+            if skip_until is None:
+                lines.append(line)
+        body = [ln for ln in lines if ln.strip() not in ('', '}')
+                and not re.match(r'^Script\s*[\^~]\{$', ln.strip())]
+        if body:                      # в секции остались чужие скрипты
+            parts.append('\n'.join(lines))
+    out = '\n'.join(parts).strip('\n')
+    _encode_datnik(lang_txt_path, (out + '\n') if out else '', enc)
 
 
 def script_roundtrip_ok(cfg, name, entry_rsm, orig_scr, orig_lang_text):
     """Собрать модули rsmc'ом (без языка) и сравнить с оригинальным .scr
-    нормализованным сравнением с CT-разрешением. (True, '') | (False, why)."""
+    нормализованным сравнением с CT-разрешением.
+
+    Возвращает (ok, why, new_ct_table): третьим — таблица ключей, которую rsmc
+    выдал этой сборке (новый ключ -> текст основного языка). По ней
+    перекеиваются неосновные языки, см. rekey_secondary_langs.
+    """
     from .build import run_rsmc
     from .rebuild import compare_scr, ct_table_from_lang  # lazy: rebuild импортирует нас
     msgs = []
@@ -402,9 +483,99 @@ def script_roundtrip_ok(cfg, name, entry_rsm, orig_scr, orig_lang_text):
             tb = _read_ct_table(tmp_scr.with_suffix('.txt'))
             good, _ = compare_scr(cfg, name, orig_scr, tmp_scr, ta, tb,
                                   msgs.append)
-        return good, '' if good else (msgs[-1].strip() if msgs else 'DIFF')
+        return good, '' if good else (msgs[-1].strip() if msgs else 'DIFF'), tb
     except BuildError as e:
-        return False, f'rsmc не собрал .rsm: {e}'
+        return False, f'rsmc не собрал .rsm: {e}', None
+
+
+def rekey_map(old_table, new_table):
+    """{старый ключ -> новый ключ} по совпадению ТЕКСТА основного языка.
+
+    Единственный мост между языками — сам текст: rsmc нумерует ключи заново, а
+    перевод в неосновном языке лежит под старыми номерами. Повторяющиеся тексты
+    раздаются по очереди (в реальных модах это разные реплики с одинаковыми
+    словами — «Да», «Конец связи»), ключи без пары остаются несопоставленными.
+    """
+    by_text = {}
+    for k, text in sorted((new_table or {}).items(), key=lambda kv: _key_num(kv[0])):
+        by_text.setdefault(text, []).append(k)
+    mapping, unmatched = {}, []
+    for k, text in sorted((old_table or {}).items(), key=lambda kv: _key_num(kv[0])):
+        queue = by_text.get(text)
+        if queue:
+            mapping[k] = queue.pop(0)
+        else:
+            unmatched.append(k)
+    return mapping, unmatched
+
+
+def _key_num(k):
+    try:
+        return (0, int(k))
+    except ValueError:
+        return (1, k)
+
+
+def rekey_secondary_langs(src_root, name, languages, primary, old_primary_table,
+                          new_table):
+    """Перенумеровать секции Script^{name} неосновных языков под ключи rsmc.
+
+    Формат не даёт связать перевод с репликой иначе как через номер ключа, а
+    номера rsmc раздаёт заново — поэтому после открытия мода перевод должен
+    переехать на новую нумерацию, иначе второй язык в игре немой. Дальше их
+    держит в согласии гейт сборки (build.check_secondary_lang_keys).
+    Возвращает список предупреждений.
+    """
+    mapping, unmatched = rekey_map(old_primary_table, new_table)
+    warnings = []
+    if not mapping:
+        return warnings
+    for lang in languages:
+        if lang == primary:
+            continue
+        path = src_root / 'CFG' / lang / 'Lang.txt'
+        if not path.exists():
+            continue
+        text, enc = _decode_datnik(path.read_bytes())
+        out, changed, missed = [], 0, 0
+        depth, in_name = 0, False
+        for line in text.splitlines():
+            s = line.strip()
+            m = re.match(r'^(\S+)\s*[\^~]\{$', s)
+            if m:
+                depth += 1
+                if depth == 2 and m.group(1) == name:
+                    in_name = True
+                out.append(line)
+                continue
+            if s == '}':
+                if in_name and depth == 2:
+                    in_name = False
+                depth -= 1
+                out.append(line)
+                continue
+            if in_name and '=' in s:
+                k, v = s.split('=', 1)
+                new_k = mapping.get(k.strip())
+                if new_k is None:
+                    missed += 1
+                    out.append(line)
+                else:
+                    changed += 1
+                    out.append(line.replace(f'{k}=', f'{new_k}=', 1)
+                               if line.lstrip().startswith(k) else f'        {new_k}={v}')
+                continue
+            out.append(line)
+        if changed:
+            _encode_datnik(path, '\n'.join(out) + '\n', enc)
+            warnings.append(f'{lang}: перевод переключён на нумерацию rsmc '
+                            f'({changed} ключ(ей)' +
+                            (f', без пары {missed}' if missed else '') + ')')
+        if unmatched and lang != primary:
+            warnings.append(f'{lang}: {len(unmatched)} текст(ов) основного языка '
+                            f'не нашли пары в новой таблице — эти реплики после '
+                            f'сборки останутся без перевода')
+    return warnings
 
 
 def open_script(cfg, mod_dir, src_root, name, lang_txt_text, lang_dat_path=None):
@@ -493,24 +664,30 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
 
     scrs = sorted((mod_dir / 'DATA' / 'Script').glob('*.scr')) \
         if (mod_dir / 'DATA' / 'Script').is_dir() else []
-    if name is None:
-        if len(scrs) == 1:
-            name = scrs[0].stem
-        elif not scrs:
-            name = mod_dir.name
-        else:
-            raise BuildError(f'в моде несколько .scr ({[s.stem for s in scrs]}) — '
-                             f'укажи --name')
-    has_script = any(s.stem == name for s in scrs)
+    # Мультискриптовый мод (28 из 236 скриптовых модов корпуса) разбирается
+    # целиком: --name задаёт лишь ОСНОВНОЙ скрипт, остальные .scr открываются
+    # такими же полноправными. Основной выбирается ниже — по Main.dat.
+    stems = [s.stem for s in scrs]
 
     # --- CFG: датники -> тексты ---------------------------------------
     warnings = []
     cache_text = None
     cache_dat = mod_dir / 'CFG' / 'CacheData.dat'
     if cache_dat.exists():
-        cache_text = dat_to_text(cfg, cache_dat)
-    if install is None and cache_text and has_script:
-        install = derive_install_from_cachedata(cache_text, name)
+        try:
+            cache_text = dat_to_text(cfg, cache_dat)
+        except (BuildError, UnicodeDecodeError) as e:
+            # Тот же случай, что ниже с Lang/Main: датник не читается как
+            # текст (WH40kGuns — байт вне cp1251) ⇒ остаётся бинарником.
+            warnings.append(f'CFG/CacheData.dat: не читается как текст '
+                            f'({str(e)[:60]}) — оставлен бинарником')
+    if install is None and cache_text:
+        # По любому из скриптов: какой из них основной, ещё не решено, а путь
+        # установки у всех записей CacheData один и тот же.
+        for stem in ([name] if name else stems):
+            install = derive_install_from_cachedata(cache_text, stem)
+            if install:
+                break
     if install is None:
         # Мод лежит в <игра>/Mods/... ? Тогда install — его путь от корня игры.
         game = cfg.tool('game')
@@ -520,7 +697,7 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
             except ValueError:
                 pass
     if install is None:
-        install = f'Mods/Imported/{name}'
+        install = f'Mods/Imported/{name or mod_dir.name}'
         warnings.append(f'install не удалось определить — взят {install}')
 
     src_root = dest / 'src'
@@ -529,7 +706,11 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
     # Конвертируются только датники, которые build умеет собирать обратно:
     # Main.dat, <lang>/Lang.dat, CacheData.dat. Прочие .dat (если есть) уедут
     # в src/ бинарниками — build скопирует их как есть.
-    languages, lang_texts, converted_dats = [], {}, {str(cache_dat).lower()}
+    languages, lang_texts = [], {}
+    # Конвертированные датники в src/ не копируются (их пересоберёт build);
+    # CacheData попадает сюда, только если его удалось прочитать.
+    converted_dats = {str(cache_dat).lower()} if cache_text is not None else set()
+    main_text, binary_dats = None, []
     cfg_dir = mod_dir / 'CFG'
     if cfg_dir.is_dir():
         for dat in sorted(cfg_dir.rglob('*.dat')):
@@ -538,7 +719,27 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
             is_lang = len(rel.parts) == 2 and rel.name.lower() == 'lang.dat'
             if dat == cache_dat or not (is_main or is_lang):
                 continue
-            text = dat_to_text(cfg, dat)
+            try:
+                text = dat_to_text(cfg, dat)
+            except (BuildError, UnicodeDecodeError) as e:
+                # Текст датника BPE 1.9 отдаёт в cp1251, но встречаются байты
+                # вне неё (WH40kGuns) — такой файл через текст не проходит,
+                # оставляем бинарником.
+                binary_dats.append((str(rel).replace('\\', '/'),
+                                    f'не читается как текст ({str(e)[:60]})'))
+                continue
+            if '//' in text:
+                # BlockPar считает `//` началом комментария и при обратной
+                # конвертации обрезает значение (проверено на BPE 1.9 и 2.0):
+                # строка с URL (`https://…` в датниках Den_DatVersion) через
+                # текст не воспроизводится. Такой .dat остаётся бинарным
+                # исходником — как медиа, чей round-trip не сошёлся.
+                binary_dats.append((str(rel).replace('\\', '/'),
+                                    'значение содержит "//" — BlockPar обрезал бы '
+                                    'его при обратной конвертации'))
+                continue
+            if is_main:
+                main_text = text
             if is_lang:
                 lang = rel.parts[0]
                 languages.append(lang)
@@ -547,17 +748,66 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
             _encode_datnik(out_txt, text, 'utf-16le')
             converted_dats.add(str(dat).lower())
     primary = 'Rus' if 'Rus' in languages else (languages[0] if languages else None)
+    # Язык, оставшийся бинарным, rsmc'у недоступен: свою таблицу текстов он
+    # мержит в текстовый Lang, поэтому скрипт такого мода собирается бинарным
+    # passthrough'ем — иначе тексты просто не доедут.
+    force_scr = any(Path(rel).name.lower() == 'lang.dat' for rel, _why in binary_dats)
+    for rel, why in binary_dats:
+        warnings.append(f'CFG/{rel}: {why} — файл оставлен бинарником'
+                        + (' (скрипт собирается веткой engine=scr)'
+                           if force_scr and rel.lower().endswith('lang.dat') else ''))
+
+    # Основной скрипт — тот, что подключён в Main.dat (`X=1,Script.X`): у
+    # мультискриптовых модов вспомогательные .scr там не упомянуты вовсе
+    # (RefGreeting: 6 скриптов, в Main.dat один), а имя каталога с именем
+    # скрипта обычно не совпадает.
+    if name is None:
+        linked = [s for s in stems
+                  if main_text and re.search(
+                      re.escape(s) + r'\s*=\s*1\s*,\s*Script\.' + re.escape(s), main_text)]
+        if linked:
+            name = linked[0]
+        elif mod_dir.name in stems:
+            name = mod_dir.name
+        elif stems:
+            name = stems[0]
+        else:
+            name = mod_dir.name
+    script_names = ([name] if name in stems else []) + [s for s in stems if s != name]
+    has_script = name in stems
 
     if cache_text is not None:
-        cache_src, w = make_cachedata_source(cache_text, install, name)
+        cache_src, w = make_cachedata_source(cache_text, install, script_names)
         warnings += w
         if cache_src:
             _encode_datnik(src_root / 'CFG' / 'CacheData.txt', cache_src, 'utf-16le')
+
+    # INSTALL.TXT генерируется сборкой из списка пакетов — но только если автор
+    # перечислил в нём ровно все .pkg мода. Den_UIRecolor везёт три пакета, а в
+    # INSTALL.TXT вписан один (языковые монтируются иначе) — такой файл
+    # выводом не воспроизвести, переносим его в src/ как обычный файл.
+    install_txt_path = next((f for f in mod_dir.iterdir()
+                             if f.is_file() and f.name.lower() == 'install.txt'), None)
+    mod_pkgs = {p.name.lower() for p in mod_dir.rglob('*.pkg') if p.is_file()}
+    install_txt_generated = False
+    if install_txt_path is not None:
+        listed = set()
+        raw = install_txt_path.read_bytes()
+        text = raw[2:].decode('utf-16-le') if raw[:2] == b'\xff\xfe' \
+            else raw.decode('cp1251', errors='replace')
+        for line in text.splitlines():
+            if '=' in line:
+                listed.add(line.split('=', 1)[1].strip().rsplit('\\', 1)[-1].lower())
+        install_txt_generated = bool(listed) and listed == mod_pkgs
+        if not install_txt_generated:
+            warnings.append('INSTALL.TXT перечисляет не все пакеты мода — '
+                            'перенесён в src/ как есть (build его не генерирует)')
 
     # --- статика: всё, кроме артефактов -------------------------------
     media_cfg = {'gi_format': 'argb', 'gai_format': 'delta'}
     stats = MediaStats()
     packages = []
+    deferred_ct = []                  # [(path, rel, script_name)] — см. ниже
     for f in sorted(mod_dir.rglob('*')):
         if f.is_dir():
             continue
@@ -567,14 +817,23 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
         rel_low = [p.lower() for p in rel.parts]
         if str(f).lower() in converted_dats:
             continue  # уже конвертированы в .txt-исходники
-        if str(rel).lower() in _SKIP_ROOT_FILES:
-            continue  # INSTALL.TXT генерирует build
-        if rel_low[:2] == ['data', 'script'] and (low == f'{name.lower()}.scr'
-                                                  or low == f'{name.lower()}.txt'):
-            continue  # скрипт декомпилируется отдельно; .txt — таблица CT (артефакт)
-        if is_ct_table_file(f, name):
-            warnings.append(f'{rel}: таблица CT-ключей (артефакт сборки RScript) — '
-                            f'в src/ не перенесена, rsmc пишет свою')
+        if str(rel).lower() in _SKIP_ROOT_FILES and install_txt_generated:
+            continue  # INSTALL.TXT воспроизводит build (список = все пакеты мода)
+        if (len(rel_low) == 3 and rel_low[:2] == ['data', 'script']
+                and any(low == f'{n.lower()}.scr' for n in script_names)):
+            # Только НЕПОСРЕДСТВЕННО в DATA/Script: у FairanCoalitionHeart в
+            # подпапке «Бэкап» лежит .scr с тем же именем — это файл мода, и
+            # выбрасывать его как артефакт нельзя.
+            continue  # скрипты декомпилируются/копируются отдельно
+        art_of = next((n for n in script_names
+                       if (len(rel_low) == 3 and rel_low[:2] == ['data', 'script']
+                           and low == f'{n.lower()}.txt') or is_ct_table_file(f, n)), None)
+        if art_of is not None:
+            # Таблица CT-ключей: артефакт сборки RScript. Её воспроизводит rsmc
+            # — но только на своей ветке. Скрипт, оставшийся бинарником, ничего
+            # не пишет, и тогда таблица обязана доехать до build как файл мода.
+            # Ветку узнаём ниже, поэтому решение откладываем.
+            deferred_ct.append((f, rel, art_of))
             continue
         if (rel_low[0] == 'cfg' and low.endswith('.txt')
                 and f.with_suffix('.dat').exists()):
@@ -605,43 +864,104 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
     # Иначе оригинальный .scr остаётся БИНАРНЫМ исходником (engine=scr),
     # а модули .rsm лежат рядом как справочные.
     src_modules = kept_rson = None
-    engine = 'rsmc' if has_script else 'none'
     primary_lang_text = lang_texts.get(primary) if primary else None
-    if has_script:
-        orig_scr = mod_dir / 'DATA' / 'Script' / f'{name}.scr'
+    # Какие скрипты автор внёс в секцию Script CacheData.dat: воспроизводим
+    # ровно этот список (у RefGreeting из шести скриптов там только основной,
+    # у BlockSOTE — оба; вывести правилом нельзя).
+    # Ключ записи не обязан совпадать с именем скрипта (Cat_Tardis:
+    # `tardis=…\cat_tardis.scr`) — запоминаем авторский ключ по пути.
+    cached_names, cache_keys = set(), {}
+    if cache_text:
+        for sec_name, chunk in split_top_sections(cache_text):
+            if sec_name != 'Script':
+                continue
+            for ln in chunk.splitlines():
+                if '=' not in ln:
+                    continue
+                key, value = ln.split('=', 1)
+                key = key.strip()
+                cached_names.add(key)
+                stem = value.strip().replace('/', '\\').rsplit('\\', 1)[-1]
+                if stem.lower().endswith('.scr'):
+                    cache_keys[stem[:-4].lower()] = key
+    opened = []                       # [{'name', 'engine', 'entry', 'modules'}]
+    for scr_name in (script_names if has_script else []):
+        orig_scr = mod_dir / 'DATA' / 'Script' / f'{scr_name}.scr'
+        modules = rson = None
         try:
-            src_modules, kept_rson = open_script(
-                cfg, mod_dir, src_root, name, primary_lang_text,
+            modules, rson = open_script(
+                cfg, mod_dir, src_root, scr_name, primary_lang_text,
                 lang_dat_path=(mod_dir / 'CFG' / primary / 'Lang.dat')
                 if primary else None)
-            ok_rt, why_rt = script_roundtrip_ok(
-                cfg, name, src_modules / 'main.rsm', orig_scr, primary_lang_text)
+            ok_rt, why_rt, new_ct = script_roundtrip_ok(
+                cfg, scr_name, modules / 'main.rsm', orig_scr, primary_lang_text)
+            if ok_rt and force_scr:
+                ok_rt, why_rt = False, 'Lang.dat остался бинарным (см. выше)'
         except BuildError as e:
-            src_modules = kept_rson = None
-            ok_rt, why_rt = False, str(e)
-        if ok_rt:
-            # Тексты скрипта живут в .rsm (text:) — оригинальная секция
-            # Script^{<name>} в Lang-исходнике избыточна: rsmc генерит свою
-            # таблицу заново. Вычищаем, чтобы не копить мёртвые ключи.
-            if primary and primary in lang_texts:
-                _strip_lang_script_section(src_root / 'CFG' / primary / 'Lang.txt')
-            if len(languages) > 1:
-                warnings.append(
-                    'мультиязычный мод: секции Script неосновных языков ведут '
-                    'СТАРУЮ нумерацию CT-ключей — после первой сборки их надо '
-                    'переключить вручную (см. docs/STAGE0.md, многоязычность)')
+            modules = rson = None
+            ok_rt, why_rt, new_ct = False, str(e), None
+        # Связь «скрипт <-> запись CacheData» ищем по ПУТИ, а не по имени:
+        # у Cat_Tardis ключ `Tardis` ведёт на `cat_tardis.scr`, и совпадение
+        # имени с чужим ключом дало бы лишнюю запись в пересборке.
+        cache_key = cache_keys.get(scr_name.lower())
+        if cache_text:
+            in_cache = cache_key is not None
         else:
-            engine = 'scr'
+            # Нет CFG/CacheData.dat вовсе (RefLitRes: скрипт запускает соседний
+            # мод) — генерировать его нельзя, в пересборке он был бы лишним.
+            # Нечитаемый датник остаётся бинарником, там cache не наше дело.
+            in_cache = cache_dat.exists()
+        if ok_rt:
+            if len(languages) > 1 and primary_lang_text:
+                # Перевод неосновных языков лежит под СТАРЫМИ номерами ключей, а
+                # rsmc раздаёт их заново — переключаем сразу при открытии,
+                # иначе второй язык в игре молчит.
+                from .rebuild import ct_table_from_lang
+                warnings += rekey_secondary_langs(
+                    src_root, scr_name, languages, primary,
+                    ct_table_from_lang(primary_lang_text, scr_name), new_ct)
+            opened.append({'name': scr_name, 'engine': 'rsmc',
+                           'entry': f'src/DATA/Script/{scr_name}.src/main.rsm',
+                           'cache': in_cache, 'cache_key': cache_key,
+                           'modules': modules, 'rson': rson})
+        else:
             (src_root / 'DATA' / 'Script').mkdir(parents=True, exist_ok=True)
             shutil.copy2(orig_scr, src_root / 'DATA' / 'Script' / orig_scr.name)
-            ref = (f'модули {src_modules.name}/ — справочные'
-                   if src_modules else 'модулей .rsm нет')
+            ref = (f'модули {modules.name}/ — справочные'
+                   if modules else 'модулей .rsm нет')
             warnings.append(
-                f'.rsm-ветка НЕ воспроизводит оригинальный .scr ({why_rt}) — '
-                f'скрипт оставлен бинарником (engine=scr), {ref}; тексты '
-                f'остаются в Lang.txt')
+                f'{scr_name}: .rsm-ветка НЕ воспроизводит оригинальный .scr '
+                f'({why_rt}) — скрипт оставлен бинарником (engine=scr), {ref}; '
+                f'тексты остаются в Lang.txt')
+            opened.append({'name': scr_name, 'engine': 'scr', 'entry': None,
+                           'cache': in_cache, 'cache_key': cache_key,
+                           'modules': modules, 'rson': rson})
+        if scr_name == name:
+            src_modules, kept_rson = modules, rson
+
+    # --- отложенные CT-таблицы: чей скрипт остался бинарником, тот файл нужен
+    scr_engine = {s['name'].lower(): s['engine'] for s in opened}
+    for f, rel, art_of in deferred_ct:
+        if scr_engine.get(art_of.lower()) == 'rsmc':
+            warnings.append(f'{rel}: таблица CT-ключей (артефакт сборки RScript) — '
+                            f'в src/ не перенесена, rsmc пишет свою')
+            continue
+        dst = src_root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(f, dst)
+
+    rsmc_names = [s['name'] for s in opened if s['engine'] == 'rsmc']
+    if rsmc_names:
+        # Тексты этих скриптов живут в .rsm (text:) — их секции Script^{<name>}
+        # в Lang-исходнике избыточны: rsmc генерит таблицы заново. Вычищаем,
+        # чтобы не копить мёртвые ключи; блоки скриптов с engine=scr остаются.
+        if primary and primary in lang_texts:
+            all_rsmc = len(rsmc_names) == len(opened)
+            _strip_lang_script_section(src_root / 'CFG' / primary / 'Lang.txt',
+                                       None if all_rsmc else rsmc_names)
 
     # --- srmod.json / .gitignore ---------------------------------------
+    engine = opened[0]['engine'] if opened else 'none'
     if engine == 'rsmc':
         script_cfg = {'engine': 'rsmc',
                       'entry': f'src/DATA/Script/{name}.src/main.rsm'}
@@ -649,19 +969,42 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
         script_cfg = {'engine': 'scr'}
     else:
         script_cfg = {'engine': 'none'}
-    had_install_txt = any(f.name.lower() == 'install.txt'
-                          for f in mod_dir.iterdir() if f.is_file())
+    if opened and not opened[0].get('cache', True):
+        script_cfg['cache'] = False       # автор не внёс его в CacheData
+    if has_script and main_text is not None and not re.search(
+            r'=\s*1\s*,\s*Script\.' + re.escape(name) + r'\s*$',
+            main_text, flags=re.M | re.I):
+        # Мод собран без связки в Main.dat (RefQuest) — скрипт запускает
+        # кто-то другой. Наше дело воспроизвести мод, а не чинить: гейт
+        # build'а для него выключается явным флагом.
+        script_cfg['main_link'] = False
+        warnings.append(f'Main.dat не подключает {name}.scr '
+                        f'(=1,Script.{name}) — так в оригинале; гейт связки '
+                        f'выключен флагом script.main_link=false')
+    had_install_txt = install_txt_generated
     project = {
         'name': name,
         'install': install,
-        'languages': languages or ['Rus'],
-        'primary_lang': primary or 'Rus',
+        # Мод без Lang.dat вообще (BlockSOTE и т.п.) — законный случай: язык не
+        # выдумываем, иначе build потребует несуществующий src/CFG/Rus/Lang.txt.
+        'languages': languages,
+        'primary_lang': primary,
         'script': script_cfg,
         'media': media_cfg,
         'packages': packages,
         'install_txt': had_install_txt,
         'deploy': {'mode': 'junction'},
     }
+    if opened and opened[0].get('cache_key') \
+            and opened[0]['cache_key'] != opened[0]['name']:
+        script_cfg['cache_key'] = opened[0]['cache_key']
+    if len(opened) > 1:
+        project['scripts'] = [
+            dict({'name': s['name'], 'engine': s['engine'], 'entry': s['entry'],
+                  'cache': s.get('cache', True)},
+                 **({'cache_key': s['cache_key']}
+                    if s.get('cache_key') and s['cache_key'] != s['name'] else {}))
+            for s in opened]
     (dest / 'srmod.json').write_text(
         json.dumps(project, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     (dest / '.gitignore').write_text('/build/\n/.srmod/\n', encoding='utf-8')
@@ -669,6 +1012,7 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
     return dest, {
         'name': name, 'install': install, 'has_script': has_script,
         'engine': engine, 'languages': languages, 'packages': packages,
+        'scripts': [{'name': s['name'], 'engine': s['engine']} for s in opened],
         'decoded': stats.decoded, 'kept_binary': stats.kept_binary,
         'src_modules': src_modules, 'kept_rson': kept_rson,
         'warnings': warnings,
@@ -677,8 +1021,13 @@ def open_mod(cfg, mod_dir, dest, name=None, install=None, force=False,
 
 def print_report(dest, report):
     _log(f'OK: мод открыт -> {dest}')
+    scripts = report.get('scripts') or []
+    if len(scripts) > 1:
+        script_desc = ', '.join(f'{s["name"]}={s["engine"]}' for s in scripts)
+    else:
+        script_desc = report['engine'] if report['has_script'] else 'нет'
     _log(f'  name={report["name"]}  install={report["install"]}  '
-         f'script={report["engine"] if report["has_script"] else "нет"}  '
+         f'script={script_desc}  '
          f'langs={",".join(report["languages"]) or "-"}')
     if report['src_modules']:
         _log(f'  скрипт: {report["src_modules"]} (+ {Path(report["kept_rson"]).name} '

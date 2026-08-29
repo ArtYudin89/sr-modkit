@@ -63,8 +63,10 @@ def build_parser():
                        help='дополнительный язык (можно повторять); по умолчанию только primary')
     p_new.add_argument('--force', action='store_true', help='скаффолдить даже в непустой каталог')
 
-    p_lint = sub.add_parser('lint', help='статические проверки .rsm (DText в dialogMsg, цифровые state)')
+    p_lint = sub.add_parser('lint', help='статические проверки .rsm (грабли rsmc + сверка со схемой языка)')
     p_lint.add_argument('project', nargs='?', help='каталог мода (по умолчанию cwd)')
+    p_lint.add_argument('--no-dsl', action='store_true',
+                        help='без сверки деклараций с data/rsm-dsl.json (только грабли rsmc)')
 
     p_watch = sub.add_parser('watch', help='пересобирать при изменении исходников')
     p_watch.add_argument('project', nargs='?', help='каталог мода (по умолчанию cwd)')
@@ -147,7 +149,7 @@ def main(argv=None):
 
     if args.command == 'lint':
         cfg = configmod.Config(project_dir=getattr(args, 'project', None))
-        return lintmod.run_lint(cfg)
+        return lintmod.run_lint(cfg, use_dsl=not args.no_dsl)
 
     if args.command == 'watch':
         cli_tools = _tool_cli_overrides(args)

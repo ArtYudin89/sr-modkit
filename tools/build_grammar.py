@@ -206,6 +206,74 @@ def build_grammar(lexicon):
     }
 
 
+DAT_SCOPE = 'rangers-dat'
+DAT_OUT = os.path.join(ROOT, 'syntaxes', 'rangers-dat.tmLanguage.json')
+
+
+def build_dat_grammar(lexicon):
+    """Грамматика текстовых исходников датников (Lang.txt, Main.txt, CacheData.txt).
+
+    Формат — BlockPar: блоки `Имя ^{ … }` (и `~{` — сортированный вариант),
+    записи `ключ=значение` и комментарии, которые BPE 1.9 честно вырезает при
+    txt→dat. Значения бывают кодом (`CodeBeforeRun` в ML-панелях), поэтому
+    ключевые слова языка подсвечиваем теми же списками, что и в .rsm — они из
+    схемы RScript, а не выдуманы здесь.
+    """
+    kinds = names_by_kind(lexicon)
+    dat = lambda name: '%s.%s' % (name, DAT_SCOPE)
+    repository = {
+        'comment-block': {'name': dat('comment.block'), 'begin': r'/\*', 'end': r'\*/'},
+        'comment-line': {'name': dat('comment.line.double-slash'), 'match': '//.*'},
+        'block-open': {
+            # Имя необязательно: в Lang.dat реальных модов есть безымянные
+            # блоки — строка вида "    ~{" (проверено на корпусе).
+            'match': r'^\s*([^=\s]*)\s*([\^~])(\{)',
+            'captures': {
+                '1': {'name': dat('entity.name.section')},
+                '2': {'name': dat('keyword.operator.block')},
+                '3': {'name': dat('punctuation.section.block.begin')},
+            },
+        },
+        'block-close': {
+            'name': dat('punctuation.section.block.end'),
+            'match': r'^\s*\}\s*$',
+        },
+        'entry': {
+            'match': r'^\s*([^=\r\n]+?)\s*(=)(.*)$',
+            'captures': {
+                '1': {'name': dat('variable.other.property')},
+                '2': {'name': dat('keyword.operator.assignment')},
+                '3': {'patterns': [{'include': '#value'}]},
+            },
+        },
+        'value': {
+            'patterns': [
+                {'name': dat('keyword.control'),
+                 'match': r'\b(%s)\b' % alternation(CONTROL_KEYWORDS)},
+                {'name': dat('storage.type'),
+                 'match': r'\b(%s)\b' % alternation(TYPE_KEYWORDS + ['function'])},
+                {'name': dat('support.function'),
+                 'match': r'\b(%s)\b' % alternation(kinds.get('function', []))},
+                {'name': dat('constant.language'),
+                 'match': r'\b(%s)\b' % alternation(kinds.get('constant', []))},
+                {'name': dat('constant.numeric'),
+                 'match': r'\b\d+(\.\d+)?\b'},
+                {'name': dat('string.unquoted'), 'match': r'[^\r\n]+'},
+            ],
+        },
+    }
+    order = ['comment-block', 'comment-line', 'block-open', 'block-close', 'entry']
+    return {
+        'name': 'Rangers Dat (BlockPar text)',
+        'scopeName': 'source.%s' % DAT_SCOPE,
+        'fileTypes': [],
+        'foldingStartMarker': r'[\^~]\{',
+        'foldingStopMarker': r'^\s*\}',
+        'patterns': [{'include': '#%s' % key} for key in order],
+        'repository': repository,
+    }
+
+
 # --------------------------------------------------------------------------- смоук
 
 class _Rule(object):
@@ -306,6 +374,8 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--lexicon', default=DEFAULT_LEXICON, help='lexicon.json')
     parser.add_argument('--out', default=DEFAULT_OUT, help='куда писать грамматику')
+    parser.add_argument('--dat-out', default=DAT_OUT,
+                        help='куда писать грамматику датниковых .txt')
     parser.add_argument('--check', nargs='?', const=DEFAULT_CHECK_DIR, default=None,
                         metavar='DIR', help='смоук-токенизация *.rsm в каталоге')
     parser.add_argument('--report', action='store_true', help='печатать сводку')
@@ -325,6 +395,11 @@ def main():
         json.dump(grammar, fh, ensure_ascii=False, indent=1)
         fh.write('\n')
 
+    dat_grammar = build_dat_grammar(lexicon)
+    with io.open(args.dat_out, 'w', encoding='utf-8', newline='\n') as fh:
+        json.dump(dat_grammar, fh, ensure_ascii=False, indent=1)
+        fh.write('\n')
+
     if args.report:
         kinds = names_by_kind(lexicon)
         print('лексикон  : %s' % ', '.join(
@@ -333,6 +408,8 @@ def main():
         print('паттернов : %d' % len(grammar['patterns']))
         print('записано  : %s (%.1f КБ)'
               % (args.out, os.path.getsize(args.out) / 1024.0))
+        print('датники   : %s (%.1f КБ)'
+              % (args.dat_out, os.path.getsize(args.dat_out) / 1024.0))
 
     if args.check is not None:
         if not os.path.isdir(args.check):

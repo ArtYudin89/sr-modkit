@@ -48,7 +48,7 @@
   },
   "place": {
     "prefix": "place",
-    "body": ["place(\"${1:plName}\", {type: \"${2|nearItem,nearPlanet,inSpace,nearStar|}\", angle: ${3:0}, dist: ${4:0.5}, radius: ${5:20}, obj1: \"${6:iItem}\", star: \"${7:MainStar}\"});"],
+    "body": ["place(\"${1:plName}\", {type: \"${2|nearItem,free,nearPlanet,inPlanet,toStar,fromShip,coords|}\", angle: ${3:0}, dist: ${4:0.5}, radius: ${5:20}, obj1: \"${6:iItem}\", star: \"${7:MainStar}\"});"],
     "description": "Точка в системе (привязка к объекту)"
   },
   "item": {
@@ -58,7 +58,7 @@
   },
   "state": {
     "prefix": "state",
-    "body": ["state(\"${1:StName}\", {move: \"${2|none,move,follow,attack|}\", takeAllItem: false});"],
+    "body": ["state(\"${1:StName}\", {move: \"${2|none,move,follow,jump,landing,free|}\", takeAllItem: false});"],
     "description": "Состояние группы — её поведение"
   },
   "state (с диалогом и кодом)": {

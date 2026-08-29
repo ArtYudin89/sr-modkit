@@ -19,6 +19,7 @@
 Запуск:  python tools/build_dsl_schema.py [--rsmc PATH] [--out data/rsm-dsl.json]
 """
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -54,8 +55,13 @@ CODE_FIELDS = {'code', 'onActCode', 'onTalkCode'}
 
 # Значения, которые rsmc НЕ проверяет, но которые реально встречаются в
 # шиппенных модах (снято прогоном по корпусу декомпилированных .rsm 2026-08-04).
+# Значения, которые rsmc не проверяет: собраны по корпусу .rsm (счётчики на
+# 2026-08-28 — restart 137, exit 96, shop 14, planet 9, block 8, hangar 7,
+# fastexit 1). Список наблюдаемый, а не исчерпывающий — линт ругается на
+# незнакомое значение только предупреждением.
 OBSERVED = {
-    'dialogAnswer.answerCommand': ['restart', 'exit', 'shop', 'hangar', 'planet', 'fastexit'],
+    'dialogAnswer.answerCommand': ['restart', 'exit', 'shop', 'hangar', 'planet',
+                                   'block', 'fastexit'],
 }
 
 
@@ -245,6 +251,36 @@ def _render(overrides):
     return text
 
 
+_SENTINEL = '@@SRMOD@@'
+
+
+def _render_form(placeholder, literal, as_array):
+    """То же, но значение подставляется в ЗАДАННОЙ форме — массивом или голым
+    литералом, независимо от того, как плейсхолдер стоит в _BASE.
+
+    Форма решает всё (проверено 2026-08-28 живым rsmc): флаговые поля
+    (`race`, `owner`, `type`, `economy`, `government`) компилятор проверяет
+    только внутри `[...]`, а голую строку глотает молча и ТЕРЯЕТ; скалярные
+    (`move`, `mainType`, `place.type`) — наоборот, массив для них
+    синтаксическая ошибка."""
+    text = _render({placeholder: _SENTINEL})
+    boxed = '[%s]' % _SENTINEL
+    value = ('[%s]' % literal) if as_array else literal
+    if boxed in text:
+        return text.replace(boxed, value)
+    return text.replace(_SENTINEL, value)
+
+
+def _expected_values(msg):
+    m = re.search(r'expected one of:?\s*([^\r\n)]*)', msg)
+    if m:
+        return [v.strip() for v in m.group(1).split(',') if v.strip()]
+    m = re.search(r'\(expected ([a-zA-Z]+(?:/[a-zA-Z0-9]+)+)\)', msg)
+    if m:
+        return m.group(1).split('/')
+    return None
+
+
 def _run_rsmc(rsmc, text, tmp):
     src = os.path.join(tmp, 'main.rsm')
     io.open(src, 'w', encoding='utf-8', newline='\n').write(text)
@@ -258,28 +294,82 @@ def _run_rsmc(rsmc, text, tmp):
 
 
 def probe_enums(rsmc):
-    """{'planet.race': [...]} + множество непроверяемых полей."""
+    """{'planet.race': {'values': [...], 'kind': 'flags'|'scalar', ...}} +
+    список полей, для которых проверки нет ни в одной форме.
+
+    Каждое поле пробуется ДВАЖДЫ — массивом и голой строкой, иначе форма
+    подмешивается в вывод: `race: ["Zzz"]` даёт список допустимых значений, а
+    `race: "Zzz"` собирается молча. Для флаговых полей дополнительно
+    проверяется байтами, теряет ли rsmc голую строку: сборка с годным
+    значением сравнивается со сборкой с мусором, и если .scr совпал — значение
+    в этой форме не доезжает до мода вообще.
+    """
     tmp = tempfile.mkdtemp(prefix='srmod_dsl_')
+    out_scr = os.path.join(tmp, 'out.scr')
     rc, msg = _run_rsmc(rsmc, _render({}), tmp)
     if rc != 0:
         raise SystemExit('опорный скрипт не собрался (rc=%d):\n%s' % (rc, msg))
 
+    def scr_hash(text):
+        if os.path.exists(out_scr):
+            os.remove(out_scr)
+        rc_, _msg = _run_rsmc(rsmc, text, tmp)
+        if rc_ != 0 or not os.path.exists(out_scr):
+            return None
+        return hashlib.md5(io.open(out_scr, 'rb').read()).hexdigest()
+
+    bad = '"__srmod_bad__"'
     enums, unvalidated = {}, []
     for label, placeholder in sorted(_PROBES.items()):
-        rc, msg = _run_rsmc(rsmc, _render({placeholder: '"__srmod_bad__"'}), tmp)
-        m = re.search(r'expected one of:?\s*([^\r\n)]*)', msg)
-        if m:
-            enums[label] = [v.strip() for v in m.group(1).split(',') if v.strip()]
-            continue
-        m = re.search(r'\(expected ([a-zA-Z]+(?:/[a-zA-Z0-9]+)+)\)', msg)
-        if m:
-            enums[label] = m.group(1).split('/')
-            continue
-        if rc == 0:
+        rc_arr, msg_arr = _run_rsmc(rsmc, _render_form(placeholder, bad, True), tmp)
+        rc_str, msg_str = _run_rsmc(rsmc, _render_form(placeholder, bad, False), tmp)
+        as_array = _expected_values(msg_arr)
+        as_string = _expected_values(msg_str)
+        if as_array and not as_string:
+            entry = {'values': as_array, 'kind': 'flags'}
+            good = as_array[1] if len(as_array) > 1 else as_array[0]
+            if rc_str == 0:
+                h_good = scr_hash(_render_form(placeholder, '"%s"' % good, False))
+                h_bad = scr_hash(_render_form(placeholder, bad, False))
+                entry['stringIgnored'] = bool(h_good and h_good == h_bad)
+            enums[label] = entry
+        elif as_string:
+            enums[label] = {'values': as_string, 'kind': 'scalar'}
+        elif rc_arr == 0 or rc_str == 0:
             unvalidated.append(label)      # rsmc проглотил мусор — проверки нет
         else:
-            print('  ? %s: неожиданный ответ rsmc (rc=%d)' % (label, rc))
+            print('  ? %s: неожиданный ответ rsmc (rc=%d/%d)' % (label, rc_arr, rc_str))
     return enums, unvalidated
+
+
+_UNKNOWN_PROBE_RE = re.compile(r'unknown [A-Za-z][A-Za-z0-9_]*\(\.\.\.\) field')
+
+
+def probe_unknown_fields(rsmc):
+    """Какие декларации ругаются на неизвестное поле, а какие глотают молча.
+
+    Проверено живым rsmc: сообщение `unknown state(...) field "zzz"` есть в
+    таблице строк, но выдаёт его только часть деклараций — `planet`, `group`,
+    `star`, `ship` лишнее поле молча игнорируют, и опечатка в имени поля
+    доезжает до игры незамеченной. Линт формулирует замечание по этому флагу.
+    """
+    tmp = tempfile.mkdtemp(prefix='srmod_unk_')
+    strict = {}
+    base = _render({})
+    for decl in DECLARATIONS:
+        lines = base.split('\n')
+        hit = None
+        for i, line in enumerate(lines):
+            if line.startswith('%s(' % decl) and '{' in line:
+                brace = line.index('{')
+                lines[i] = line[:brace + 1] + ' __srmod_zzz: 1,' + line[brace + 1:]
+                hit = i
+                break
+        if hit is None:
+            continue                      # декларации нет в опорном скрипте
+        rc, msg = _run_rsmc(rsmc, '\n'.join(lines), tmp)
+        strict[decl] = bool(rc != 0 and _UNKNOWN_PROBE_RE.search(msg))
+    return strict
 
 
 # --------------------------------------------------------------- сборка
@@ -290,8 +380,11 @@ def build(rsmc, out_path):
     shapes = parse_entry_shapes(strings)
     free = parse_free_enums(strings)
     enums, unvalidated = probe_enums(rsmc)
+    strict = probe_unknown_fields(rsmc)
     for key, values in free.items():
-        enums.setdefault(key, values)
+        # Значения из таблицы строк — только скалярные сообщения вида
+        # `(expected none/move/…)`, форма у них по определению не массив.
+        enums.setdefault(key, {'values': values, 'kind': 'scalar'})
 
     declarations = {}
     for decl in DECLARATIONS:
@@ -309,11 +402,15 @@ def build(rsmc, out_path):
         for f in decl_fields:
             key = '%s.%s' % (decl, f)
             if key in enums:
-                field_enums[f] = {'values': enums[key], 'validated': True}
+                field_enums[f] = dict(enums[key], validated=True)
             elif key in OBSERVED:
                 field_enums[f] = {'values': OBSERVED[key], 'validated': False}
         if field_enums:
             entry['enums'] = field_enums
+        if decl in strict:
+            # Ругается ли rsmc на неизвестное поле этой декларации (иначе
+            # молча игнорирует — см. probe_unknown_fields).
+            entry['strictFields'] = strict[decl]
         declarations[decl] = entry
 
     data = {
@@ -348,13 +445,23 @@ def main():
 
     data = build(args.rsmc, args.out)
     print('деклараций : %d' % len(data['declarations']))
+    flags, ignored = [], []
     for decl, entry in data['declarations'].items():
         marks = ''
         if entry.get('enums'):
             marks = '  перечислений: %d' % len(entry['enums'])
+        if entry.get('strictFields') is False:
+            marks += '  [неизвестные поля глотает молча]'
+        for field, en in (entry.get('enums') or {}).items():
+            if en.get('kind') == 'flags':
+                flags.append('%s.%s' % (decl, field))
+                if en.get('stringIgnored'):
+                    ignored.append('%s.%s' % (decl, field))
         print('  %-14s (%s) полей=%-3d req=%-2d%s'
               % (decl, ', '.join(entry['positional']) or '—',
                  len(entry['fields']), len(entry.get('required', [])), marks))
+    print('флаговые (только массивом): %s' % ', '.join(flags))
+    print('  из них строку молча теряют: %s' % ', '.join(ignored))
     print('экспорты   : %s' % ', '.join(data['exports']))
     print('типы пер-х : %s' % ', '.join(data['varTypes']))
     print('без проверки rsmc: %s' % ', '.join(data['unvalidatedFields']))

@@ -16,7 +16,7 @@
 import re
 from pathlib import Path
 
-from .build import BuildError, build as run_build
+from .build import BuildError, build as run_build, project_scripts
 from .opener import dat_to_text, is_ct_table_file, split_top_sections
 from .verify import (HEADER_SKIP, POS_KEYS, _decompile, _first_diff,
                      _import_decompiler, _norm_ws, _strip)
@@ -115,8 +115,53 @@ def _norm_datnik_lines(text):
     return [ln.strip() for ln in text.splitlines() if ln.strip()]
 
 
+def canon_blockpar(text):
+    """Датник -> каноническая структура без порядка записей.
+
+    Порядок блоков в .dat BlockParEditor НЕ сохраняет: тот же текст, записанный
+    заново, читается назад с другим порядком вложенных блоков (проверено на
+    Den_UIRecolor — у оригинала Bm начинается с formnote, у пересборки с
+    cformbg). Игра читает датник как словарь, поэтому сравнивать порядок
+    бессмысленно — сравниваем мультимножество (тип блока, имя, содержимое).
+    """
+    def parse(lines, i, out):
+        while i < len(lines):
+            s = lines[i].strip()
+            i += 1
+            if not s:
+                continue
+            if s == '}':
+                return i
+            m = re.match(r'^(\S+)\s*([\^~])\{$', s)
+            if m:
+                inner = []
+                i = parse(lines, i, inner)
+                out.append(('block', m.group(1), m.group(2), tuple(sorted(inner))))
+                continue
+            if '=' in s:
+                k, v = s.split('=', 1)
+                out.append(('kv', k.strip(), v))
+            else:
+                out.append(('raw', s, ''))
+        return i
+
+    items = []
+    parse(text.splitlines(), 0, items)
+    return tuple(sorted(items))
+
+
 def compare_dat(cfg, rel, orig_dat, new_dat, name, scr_matched, log):
-    ta, tb = dat_to_text(cfg, orig_dat), dat_to_text(cfg, new_dat)
+    try:
+        ta, tb = dat_to_text(cfg, orig_dat), dat_to_text(cfg, new_dat)
+    except (BuildError, UnicodeDecodeError):
+        # Не всякий .dat — датник BlockPar: у EvoMusic это DATA/Music/*.dat,
+        # BPE его не читает. Такие файлы едут в build копией, значит и
+        # сверяются байтами.
+        if orig_dat.read_bytes() == new_dat.read_bytes():
+            log(f'  {rel}: MATCH (байты; BlockPar этот .dat не читает)')
+            return True
+        log(f'  {rel}: DIFF (байты; BlockPar этот .dat не читает)')
+        return False
     if rel.name.lower() == 'cachedata.dat':
         # Пути в CacheData у авторских тулз кейс-небрежные (data\ vs DATA\),
         # порядок корневых секций произвольный (Bm до/после Script), игра
@@ -129,12 +174,18 @@ def compare_dat(cfg, rel, orig_dat, new_dat, name, scr_matched, log):
         if na == nb:
             log(f'  {rel}: MATCH (без регистра/порядка секций)')
             return True
+        if canon_blockpar(ta.lower()) == canon_blockpar(tb.lower()):
+            log(f'  {rel}: MATCH (порядок вложенных блоков BPE не сохраняет)')
+            return True
         diff = next(((a, b) for a, b in zip(na, nb) if a != b),
                     ('<число секций>', f'{len(na)} vs {len(nb)}'))
         log(f'  {rel}: DIFF — {str(diff[0])[:120]!r} vs {str(diff[1])[:120]!r}')
         return False
     if _norm_datnik_lines(ta) == _norm_datnik_lines(tb):
         log(f'  {rel}: MATCH')
+        return True
+    if canon_blockpar(ta) == canon_blockpar(tb):
+        log(f'  {rel}: MATCH (порядок вложенных блоков BPE не сохраняет)')
         return True
     if rel.name.lower() == 'lang.dat':
         # Script^{<name>} мержится rsmc'ом заново — сравниваем всё остальное
@@ -143,8 +194,8 @@ def compare_dat(cfg, rel, orig_dat, new_dat, name, scr_matched, log):
         keep_b = [c for n, c in split_top_sections(tb) if n != 'Script']
         sa = [c for n, c in split_top_sections(ta) if n == 'Script']
         sb = [c for n, c in split_top_sections(tb) if n == 'Script']
-        if _norm_datnik_lines('\n'.join(keep_a)) == _norm_datnik_lines('\n'.join(keep_b)):
-            if _norm_datnik_lines('\n'.join(sa)) == _norm_datnik_lines('\n'.join(sb)):
+        if canon_blockpar('\n'.join(keep_a)) == canon_blockpar('\n'.join(keep_b)):
+            if canon_blockpar('\n'.join(sa)) == canon_blockpar('\n'.join(sb)):
                 log(f'  {rel}: MATCH')
                 return True
             if scr_matched:
@@ -177,6 +228,7 @@ def verify_rebuild(cfg, original_dir):
     if not original_dir.is_dir():
         raise BuildError(f'{original_dir}: не каталог')
     name = cfg.project.get('name')
+    names = [s['name'] for s in project_scripts(cfg) if s['engine'] != 'none']
     log = print
 
     log('== rebuild: srmod build ==')
@@ -190,37 +242,39 @@ def verify_rebuild(cfg, original_dir):
                  for p in build_dir.rglob('*') if p.is_file()}
 
     # Таблицы CT для разрешения ключей: у оригинала файла-таблицы может не
-    # быть (или лежит где угодно) — истина всегда в Lang.dat.
+    # быть (или лежит где угодно) — истина всегда в Lang.dat. У мультискрипто-
+    # вого мода таблица своя на каждый скрипт.
     primary = cfg.project.get('primary_lang')
-    ta = tb = None
-    if name and primary:
-        orig_lang = orig_files.get(f'cfg/{primary.lower()}/lang.dat')
-        new_lang = new_files.get(f'cfg/{primary.lower()}/lang.dat')
-        if orig_lang:
-            ta = ct_table_from_lang(dat_to_text(cfg, orig_lang), name)
-        if new_lang:
-            tb = ct_table_from_lang(dat_to_text(cfg, new_lang), name)
-    if name:
-        ta = ta or _read_ct_table(original_dir / 'DATA' / 'Script' / f'{name}.txt')
-        tb = tb or _read_ct_table(build_dir / 'DATA' / 'Script' / f'{name}.txt')
+    orig_lang = orig_files.get(f'cfg/{primary.lower()}/lang.dat') if primary else None
+    new_lang = new_files.get(f'cfg/{primary.lower()}/lang.dat') if primary else None
+    orig_lang_text = dat_to_text(cfg, orig_lang) if orig_lang else None
+    new_lang_text = dat_to_text(cfg, new_lang) if new_lang else None
+    tables = {}
+    for n in names:
+        ta = ct_table_from_lang(orig_lang_text, n) if orig_lang_text else None
+        tb = ct_table_from_lang(new_lang_text, n) if new_lang_text else None
+        ta = ta or _read_ct_table(original_dir / 'DATA' / 'Script' / f'{n}.txt')
+        tb = tb or _read_ct_table(build_dir / 'DATA' / 'Script' / f'{n}.txt')
+        tables[n] = (ta, tb)
 
     ok = True
     scr_matched = True
-    scr_rel = f'data/script/{name}.scr'.lower() if name else None
-    # .scr сравниваем первым: от его исхода зависит трактовка Lang.dat.
+    scr_rels = {f'data/script/{n.lower()}.scr': n for n in names}
+    ct_rels = {f'data/script/{n.lower()}.txt': n for n in names}
+    # .scr сравниваем первыми: от их исхода зависит трактовка Lang.dat.
     order = sorted(set(orig_files) | set(new_files),
-                   key=lambda r: (r != scr_rel, r))
+                   key=lambda r: (r not in scr_rels, r))
     for rel in order:
         a, b = orig_files.get(rel), new_files.get(rel)
         if a is None:
-            if name and rel == f'data/script/{name.lower()}.txt':
+            if rel in ct_rels:
                 log(f'  {rel}: инфо — таблица CT от rsmc (оригинал её не шипил)')
             else:
                 log(f'  {rel}: ЛИШНИЙ в пересборке')
                 ok = False
             continue
         if b is None:
-            if name and is_ct_table_file(Path(a), name):
+            if any(is_ct_table_file(Path(a), n) for n in names):
                 log(f'  {rel}: инфо — таблица CT (артефакт сборки оригинала), '
                     f'в пересборку не переносится')
             elif (rel.startswith('cfg/') and rel.endswith('.txt')
@@ -232,9 +286,11 @@ def verify_rebuild(cfg, original_dir):
                 ok = False
             continue
         low = rel.lower()
-        if low == scr_rel:
-            good, _bytes_eq = compare_scr(cfg, name, a, b, ta, tb, log)
-            scr_matched = good
+        if low in scr_rels:
+            n = scr_rels[low]
+            ta, tb = tables.get(n, (None, None))
+            good, _bytes_eq = compare_scr(cfg, n, a, b, ta, tb, log)
+            scr_matched = scr_matched and good
             ok = ok and good
         elif low.endswith('.dat'):
             ok = compare_dat(cfg, Path(rel), a, b, name, scr_matched, log) and ok
@@ -244,7 +300,7 @@ def verify_rebuild(cfg, original_dir):
             else:
                 log(f'  {rel}: DIFF')
                 ok = False
-        elif name and low == f'data/script/{name.lower()}.txt':
+        elif low in ct_rels:
             # таблица CT: своя у каждого компилятора; строгий смысл уже
             # проверен CT-разрешением scr
             log(f'  {rel}: пропуск (таблица CT, сверяется через scr)')

@@ -27,6 +27,9 @@ DEFAULT_PROJECT = {
     'languages': ['Rus'],
     'primary_lang': 'Rus',
     'script': {'engine': 'rsmc', 'entry': None},
+    # Мультискриптовый мод (28 из 236 скриптовых модов корпуса): список
+    # {name, engine, entry}. Пусто — один скрипт, описанный "name" + "script".
+    'scripts': [],
     'lang': {'merge_into': 'txt'},
     'media': {'gi_format': 'argb', 'gai_format': 'delta'},
     'packages': [],

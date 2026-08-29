@@ -55,7 +55,7 @@ def import_rson(cfg, rson_path, name=None, keep_source=True):
     if problems:
         print(f'lint: {len(problems)} замечание(й) в импортированном моде '
               f'(возможна потеря диалогового текста) — см. `srmod lint`:')
-        for path, line, msg_ in problems:
-            print(f'  {path}:{line}: {msg_}')
+        for path, line, severity, msg_ in problems:
+            print(f'  {path}:{line}: {severity}: {msg_}')
 
     return src_dir, kept_rson
