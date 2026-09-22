@@ -25,6 +25,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from .vendor import srblockpar
+
 from .build import (BOM, BuildError, _decode_datnik, _encode_datnik,
                     _import_decompiler_run)
 
@@ -55,20 +57,20 @@ def _log(msg):
 # ------------------------------------------------------------------ blockpar dat->txt
 
 def dat_to_text(cfg, dat_path):
-    """CFG/*.dat -> текст (str). BPE выбирает направление по расширению;
-    1.9 пишет txt в cp1251, 2.0 — в UTF-16LE+BOM, поэтому байты декодируем
-    сами и дальше работаем со строкой."""
-    decomp_run = _import_decompiler_run(cfg)
-    blockpar = cfg.tool('blockpar')
-    if not blockpar:
-        raise BuildError('blockpar (BlockParEditor.exe) не найден')
-    with tempfile.TemporaryDirectory(prefix='srmod_open_bpe_') as tmp:
-        out_txt = Path(tmp) / (dat_path.stem + '.txt')
-        ok, msg = decomp_run._run_blockpar(Path(blockpar), dat_path, out_txt)
-        if not ok or not out_txt.exists():
-            raise BuildError(f'blockpar {dat_path} -> txt: {msg}')
-        text, _enc = _decode_datnik(out_txt.read_bytes())
-    return text
+    """CFG/*.dat -> текст (str) своим кодом, без внешних программ.
+
+    Значения, в которых есть `//`, текстовый вид не переживут: разбор самой
+    игры режет строку по этим знакам, и обратная сборка их потеряет. Такие
+    значения не проглатываются молча — о них печатается предупреждение.
+    """
+    try:
+        document = srblockpar.read_dat(dat_path)
+    except (srblockpar.DatError, srblockpar.BlockParError, srblockpar.ZLError) as e:
+        raise BuildError(f'blockpar {dat_path} -> txt: {e}')
+    for key, value in srblockpar.lossy_values(document.tree)[:5]:
+        _log(f'  ВНИМАНИЕ: {dat_path.name}: значение {key} содержит // — '
+             f'в исходнике .txt оно обрежется: {value[:60]!r}')
+    return '\r\n'.join(srblockpar.render_text(document.tree)) + '\r\n' 
 
 
 # ------------------------------------------------------------------ CacheData

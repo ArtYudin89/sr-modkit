@@ -27,7 +27,7 @@
 | **Python** 3.9 или новее | на нём написан сам `srmod` | [python.org](https://www.python.org/downloads/) — при установке **обязательно** поставьте галочку «Add Python to PATH» |
 | **rsmc.exe** | превращает текст скрипта в игровой `.scr` | релизы RScript у автора: [github.com/indiemagpie](https://github.com/indiemagpie) (файл `rsmc.zip`) |
 | **RScript.exe** 4.14f+ | нужен, только если открываете чужие моды (`srmod open` / `srmod import`) | там же |
-| **BlockParEditor.exe** | собирает текстовые файлы игры в `.dat` | [github.com/indiemagpie](https://github.com/indiemagpie) |
+| **BlockParEditor.exe** | чужой редактор датников — для работы **не нужен**, датники делает свой код (`srmod/vendor/srblockpar`); оставлен для сверки | [github.com/indiemagpie](https://github.com/indiemagpie) |
 | **rson-decompiler** | картинки (`.png` → `.gi`) и работа с `.dat` | [github.com/ArtYudin89/rson-decompiler](https://github.com/ArtYudin89/rson-decompiler) — кнопка «Code» → «Download ZIP» |
 
 Разложите их куда угодно — путь вы укажете один раз (см. следующий раздел).
@@ -409,6 +409,10 @@ GNU GPL v3 или новее, полный текст — в [LICENSE](LICENSE).
 Коротко: берёте код `srmod` — открывайте свой. Это касается и копирования кусков
 в свой файл, и поставки инструмента в составе сборки. Программа, которая просто
 вызывает `srmod` как отдельный процесс, производной работой не считается.
+
+`srmod/vendor/srblockpar` — наша же библиотека датников под GPL v3 (копия;
+исходник правится в отдельном репозитории инструментов и раскладывается по
+копиям, рядом лежит штамп `_vendored.json`).
 
 **Что лицензией не покрыто:** `rsmc.exe`, `RScript.exe` и `BlockParEditor.exe` —
 чужие программы, они не входят в этот репозиторий (только пути к ним в

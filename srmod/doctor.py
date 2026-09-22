@@ -7,6 +7,7 @@
 """
 import subprocess
 import sys
+import json
 from pathlib import Path
 
 # Кодировки исходников мода — гейт сборки (docs/STAGE0.md, (а)):
@@ -60,14 +61,33 @@ def probe_rsmc(path):
 
 
 def probe_blockpar(path):
+    """Чужой редактор датников. Для работы он больше не нужен: датники
+    читает и пишет свой код (srmod/vendor/srblockpar). Оставлен для сверки.
+    """
     if not path:
-        return 'не найден'
+        return 'не найден — и не нужен, датники делает свой код'
     name = Path(path).parent.name
     if '1.9' in name:
-        return f'{path} — 1.9 (dat→txt в cp1251)'
+        return f'{path} — 1.9 (только для сверки)'
     if '2.0' in name:
-        return f'{path} — 2.0 (dat→txt в UTF-16LE+BOM)'
-    return f'{path} — версия неизвестна по имени папки'
+        return f'{path} — 2.0 (только для сверки)'
+    return f'{path} — версия неизвестна по имени папки (нужен только для сверки)'
+
+
+def probe_srblockpar():
+    try:
+        from .vendor import srblockpar
+    except Exception as e:
+        return f'НЕ ПОДКЛЮЧИЛСЯ: {e}'
+    stamp = Path(srblockpar.__file__).parent / '_vendored.json'
+    source = ''
+    if stamp.exists():
+        try:
+            info = json.loads(stamp.read_text(encoding='utf-8'))
+            source = f", копия из sr-lab {info.get('source_commit') or '?'}"
+        except Exception:
+            source = ''
+    return f'{srblockpar.__version__} — свой разбор .dat{source}'
 
 
 def _sniff_encoding(data):
@@ -137,6 +157,7 @@ def run_doctor(cfg):
     print(f'  rsmc:     {probe_rsmc(cfg.tool("rsmc"))}')
     print(f'  rscript:  {probe_rscript(cfg.tool("rscript"), cfg.tool("decompiler"))}')
     print(f'  blockpar: {probe_blockpar(cfg.tool("blockpar"))}')
+    print(f'  srblockpar: {probe_srblockpar()}')
 
     print()
     print('== Проект ==')

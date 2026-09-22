@@ -7,8 +7,10 @@
 
 Порядок шагов и гейты не придуманы заново — калька со спеки, которая сама
 калька с рук пощупанных граблей rsmc (см. project_sr_vscode/project_scr_decompiler).
-Инструменты (rsmc/BlockParEditor/srgi.py/srpkg.py) вызываются как внешние
-процессы: ни формат .dat, ни бинарник rsmc не наши, реимплемент запрещён.
+Инструменты (rsmc/srgi.py/srpkg.py) вызываются как внешние процессы: бинарник
+rsmc не наш, реимплемент запрещён. Датники — исключение с 22.09.2026: формат
+разобран и написан свой (`srmod/vendor/srblockpar`, исходник в sr-lab, проверен
+на 1539 датниках игры и модов), BlockParEditor для сборки больше не нужен.
 """
 import json
 import os
@@ -19,6 +21,8 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+from .vendor import srblockpar
 
 BOM = {
     'utf-16le': b'\xff\xfe',
@@ -554,29 +558,23 @@ def _import_decompiler_run(cfg):
 
 
 def run_blockpar(cfg, src_txt, dst_dat):
-    """txt -> dat через BlockParEditor, ВСЕГДА под нейтральным именем.
+    """txt -> dat своим кодом (srmod/vendor/srblockpar), без внешних программ.
 
-    Грабля BPE 1.9, найдена прогоном корпуса (моды Den_DatVersion) и проверена
-    изолированно: если имя входа ИЛИ выхода — `CacheData`, редактор требует в
-    тексте секцию `Script` и, не найдя её, молча пишет ПУСТОЙ .dat (8 байт,
-    ни ошибки, ни диалога). Такой мод (CacheData только с секцией BV) собирался
-    в мусор. Под именем `srmod_bp` тот же текст конвертируется нормально —
-    поэтому конвертируем во временном каталоге и кладём результат на место.
+    Вид дерева выбирается по имени целевого файла: `CacheData.dat` — дерево
+    данных, всё остальное — датник BlockPar. Это и была грабля BlockParEditor
+    1.9 (найдена прогоном корпуса на модах Den_DatVersion): на имени
+    `CacheData` он требовал в тексте секцию `Script` и, не найдя её, молча
+    писал ПУСТОЙ .dat в 8 байт — ни ошибки, ни диалога. Обход с нейтральным
+    именем больше не нужен: имя ни на что, кроме вида дерева, не влияет.
     """
-    blockpar = cfg.tool('blockpar')
-    if not blockpar:
-        raise BuildError('blockpar (BlockParEditor.exe) не найден')
-    decomp_run = _import_decompiler_run(cfg)
     dst_dat = Path(dst_dat)
     dst_dat.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='srmod_bp_') as tmp:
-        neutral_txt = Path(tmp) / 'srmod_bp.txt'
-        neutral_dat = Path(tmp) / 'srmod_bp.dat'
-        shutil.copy2(src_txt, neutral_txt)
-        ok, msg = decomp_run._run_blockpar(Path(blockpar), neutral_txt, neutral_dat)
-        if not ok:
-            raise BuildError(f'blockpar {src_txt} -> {dst_dat}: {msg}')
-        shutil.copy2(neutral_dat, dst_dat)
+    try:
+        srblockpar.text_to_dat(src_txt, dst_dat)
+    except (srblockpar.BlockParError, srblockpar.DatError, OSError) as e:
+        raise BuildError(f'blockpar {src_txt} -> {dst_dat}: {e}')
+    if dst_dat.stat().st_size <= 16:
+        raise BuildError(f'blockpar {src_txt} -> {dst_dat}: получился пустой датник')
     return dst_dat
 
 

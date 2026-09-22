@@ -106,9 +106,9 @@ BlockParEditor молча портит UTF-8 на входе («РџСЂРёРІ
 | 1 | Медиа: `png→gi`, `*.gai.src/→gai`, `*.hai.src/→hai` — `src/DATA/**` → `build/DATA/**` (то же отн. место) | `srgi.py` из rson-decompiler |
 | 2 | Стейджинг языка: `src/CFG/<lang>/*.txt` → **временный** файл; в файл основного языка добавляется каркас `Script ^{ <scriptName> ^{ } }`, если его там нет (проверка «есть ли блок» — по тексту без комментариев!) | свой код |
 | 3 | Скрипт: `rsmc build <entry> -o build/DATA/Script/<Name>.scr --lang-txt <врем. Lang.txt>` | `rsmc.exe` |
-| 4 | `<врем. Lang.txt>` → `build/CFG/<lang>/Lang.dat`; неосновные языки — из своих исходников как есть | BlockParEditor |
-| 5 | `src/CFG/Main.txt` → `build/CFG/Main.dat`; **гейт**: в Main.txt обязана быть связка `<Name>=1,Script.<Name>` (см. ниже) | BlockParEditor |
-| 6 | Генерация `CacheData.txt` из `install`-пути → `build/CFG/CacheData.dat` | свой код + BlockParEditor |
+| 4 | `<врем. Lang.txt>` → `build/CFG/<lang>/Lang.dat`; неосновные языки — из своих исходников как есть | свой код (`vendor/srblockpar`) |
+| 5 | `src/CFG/Main.txt` → `build/CFG/Main.dat`; **гейт**: в Main.txt обязана быть связка `<Name>=1,Script.<Name>` (см. ниже) | свой код (`vendor/srblockpar`) |
+| 6 | Генерация `CacheData.txt` из `install`-пути → `build/CFG/CacheData.dat` | свой код |
 | 7 | `src/**/X.pkg.src/` → staging (медиа кодируются прямо в staging, без `png`/`times.json`) → `build/**/X.pkg` + генерация `build/INSTALL.TXT` | `srpkg.py` |
 | 8 | (опц. `--deploy` / `srmod deploy`) junction `<игра>\<install>` → `build/` — junction переживает пересборку (rmtree+mkdir по тому же пути) | свой код |
 
