@@ -72,6 +72,7 @@ UtilityFunctionsPack и константы — с коротким описан�
 | srmod: Создать новый мод… | `srmod new` |
 | srmod: Открыть готовый мод… | `srmod open` |
 | srmod: Гейт доверия | `srmod verify --gate` |
+| srmod: Тест мода в sr-lab | `sr.py test local build/` — новая игра с модом и ходы (нужен sr-lab) |
 | srmod: Проверить инструменты | `srmod doctor` |
 
 ## Настройки
@@ -80,6 +81,10 @@ UtilityFunctionsPack и константы — с коротким описан�
 `srmod.tools.rsmc` и соседи — пути к программам (перебивают автопоиск `srmod`).
 `srmod.lintOnSave` (по умолчанию включено), `srmod.buildOnSave` (выключено),
 `srmod.statusBar`.
+`srmod.tools.srlab` — папка sr-lab для команды «Тест мода»; `srmod.test.turns`
+(15), `srmod.test.where` (где гонять: на этой системе или в Windows Sandbox),
+`srmod.test.deps` (зависимости — из Steam или из агрегатора). Без sr-lab команда
+недоступна, остальное расширение работает как прежде.
 
 ## Лицензия
 

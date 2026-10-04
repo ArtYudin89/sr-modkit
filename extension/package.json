@@ -2,7 +2,7 @@
   "name": "sr-modkit",
   "displayName": "SR Modkit — моды Space Rangers HD",
   "description": "Подсветка скриптов .rsm и команды srmod (собрать, поставить в игру, проверить) прямо в VS Code",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "artyudin89",
   "license": "GPL-3.0-or-later",
   "icon": "media/icon.png",
@@ -147,6 +147,11 @@
         "command": "srmod.showOutput",
         "title": "Показать вывод",
         "category": "srmod"
+      },
+      {
+        "command": "srmod.test",
+        "title": "Тест мода в sr-lab: новая игра и ходы",
+        "category": "srmod"
       }
     ],
     "menus": {
@@ -190,7 +195,8 @@
               "deploy",
               "lint",
               "verify",
-              "doctor"
+              "doctor",
+              "test"
             ]
           },
           "project": {
@@ -287,6 +293,48 @@
           "type": "boolean",
           "default": true,
           "description": "Показывать кнопку сборки в строке состояния."
+        },
+        "srmod.tools.srlab": {
+          "type": "string",
+          "default": "",
+          "description": "Папка sr-lab (в ней sr.py) — для команды «Тест мода в sr-lab»: проверки скриптов без игры, новая игра с модом и его зависимостями и ходы своей сборкой движка, вердикт. Пусто — команда недоступна.",
+          "scope": "machine-overridable"
+        },
+        "srmod.test.turns": {
+          "type": "number",
+          "default": 15,
+          "minimum": 0,
+          "description": "Сколько ходов делать в тесте мода."
+        },
+        "srmod.test.where": {
+          "type": "string",
+          "enum": [
+            "",
+            "auto",
+            "host",
+            "sandbox"
+          ],
+          "default": "",
+          "enumDescriptions": [
+            "как настроено в sr-lab",
+            "мод с машинным кодом — в Windows Sandbox, остальное на этой системе",
+            "всё на этой системе",
+            "всё в Windows Sandbox"
+          ],
+          "description": "Где гонять тест мода."
+        },
+        "srmod.test.deps": {
+          "type": "string",
+          "enum": [
+            "steam",
+            "agg"
+          ],
+          "default": "steam",
+          "enumDescriptions": [
+            "из установки игры в Steam",
+            "из агрегатора модов (лагерь redux)"
+          ],
+          "description": "Откуда брать зависимости мода для теста."
         }
       }
     }

@@ -9,6 +9,7 @@
  * `путь:строка: текст` — тот же формат, что у problemMatcher в задачах.
  */
 const cp = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const vscode = require('vscode');
 
@@ -283,6 +284,85 @@ async function openMod(context) {
     }
 }
 
+// --------------------------------------------------------------------- тест в sr-lab
+
+/**
+ * Тест мода идёт через sr-lab — отдельный инструмент (своя сборка движка, новая игра
+ * и ходы без окна, проверки скриптов). Расширение лишь зовёт его
+ * `python <sr-lab>/sr.py test local <мод>/build --as Группа\Мод`, если путь к sr-lab
+ * указан в настройке srmod.tools.srlab; без неё команда недоступна.
+ */
+function modId(dir) {
+    try {
+        const raw = fs.readFileSync(path.join(dir, 'srmod.json'), 'utf8').replace(/^\uFEFF/, '');
+        const parts = String(JSON.parse(raw).install || '').split(/[\\/]+/).filter(Boolean);
+        if (parts.length && parts[0].toLowerCase() === 'mods') {
+            parts.shift();
+        }
+        // игра знает моды только как Группа\Мод; "Mods/Мод" без группы — имени не узнать
+        if (parts.length >= 2) {
+            return `${parts[0]}\\${parts[1]}`;
+        }
+    } catch (e) {
+        // srmod.json может быть недописан прямо сейчас — скажем ниже
+    }
+    return null;
+}
+
+/** Как запустить тест мода или null, если sr-lab не настроен. */
+function srlabTest(dir) {
+    const cfg = vscode.workspace.getConfiguration('srmod');
+    const srlab = cfg.get('tools.srlab');
+    if (!srlab || !fs.existsSync(path.join(srlab, 'sr.py'))) {
+        return null;
+    }
+    const id = modId(dir);
+    const args = [path.join(srlab, 'sr.py'), 'test', 'local', path.join(dir, 'build')];
+    if (id) {
+        args.push('--as', id);
+    }
+    args.push('--turns', String(cfg.get('test.turns') ?? 15));
+    const where = cfg.get('test.where');
+    if (where) {
+        args.push('--where', where);
+    }
+    args.push('--deps', cfg.get('test.deps') || 'steam');
+    return { cmd: cfg.get('pythonPath') || 'python', args, cwd: srlab, id };
+}
+
+async function testMod(context) {
+    const dir = await needProject(context);
+    if (!dir) {
+        return;
+    }
+    const test = srlabTest(dir);
+    if (!test) {
+        const choice = await vscode.window.showWarningMessage(
+            'Тест мода идёт через sr-lab: укажите его папку (в ней sr.py) в настройке '
+            + 'srmod.tools.srlab.', 'Открыть настройки');
+        if (choice) {
+            vscode.commands.executeCommand('workbench.action.openSettings', 'srmod.tools.srlab');
+        }
+        return;
+    }
+    if (!test.id) {
+        vscode.window.showErrorMessage(
+            'В srmod.json поле install должно быть Mods\\Группа\\Мод — без группы не знаю, '
+            + 'как мод зовут в игре.');
+        return;
+    }
+    if (!fs.existsSync(path.join(dir, 'build', 'ModuleInfo.txt'))) {
+        vscode.window.showErrorMessage('Сначала соберите мод: в build/ нет ModuleInfo.txt.');
+        return;
+    }
+    showOutput();
+    log(`\n$ python ${test.args.join(' ')}`);
+    const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: `srmod: тест ${test.id} в sr-lab` },
+        () => runner.spawn({ cmd: test.cmd, args: [], cwd: test.cwd }, test.args, {}, log));
+    reportResult(result, `тест ${test.id} пройден`);
+}
+
 // --------------------------------------------------------------------- задачи
 
 function taskProvider(context) {
@@ -300,7 +380,7 @@ function taskProvider(context) {
                 { task: 'verify', title: 'гейт доверия' },
                 { task: 'doctor', title: 'проверить инструменты' },
             ];
-            return specs.map((spec) => {
+            const tasks = specs.map((spec) => {
                 const task = new vscode.Task(
                     { type: 'srmod', task: spec.task },
                     vscode.TaskScope.Workspace,
@@ -317,6 +397,19 @@ function taskProvider(context) {
                 }
                 return task;
             });
+            const test = srlabTest(dir);
+            if (test && test.id) {
+                const task = new vscode.Task(
+                    { type: 'srmod', task: 'test' },
+                    vscode.TaskScope.Workspace,
+                    `test (${project.label(dir)})`,
+                    'srmod',
+                    new vscode.ProcessExecution(test.cmd, test.args, { cwd: test.cwd, env: runner.env() }));
+                task.detail = 'sr-lab — новая игра с модом и ходы своей сборкой, вердикт';
+                task.group = vscode.TaskGroup.Test;
+                tasks.push(task);
+            }
+            return tasks;
         },
         resolveTask(task) {
             return task;
@@ -387,6 +480,7 @@ function activate(context) {
                 'обе ветки сборки совпали');
         }
     });
+    command('srmod.test', () => testMod(context));
     command('srmod.new', () => newMod(context));
     command('srmod.open', () => openMod(context));
     command('srmod.watchStart', () => watchStart(context));
