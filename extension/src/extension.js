@@ -18,9 +18,11 @@ const project = require('./project');
 const dsl = require('./dsl');
 const lexicon = require('./lexicon');
 const definition = require('./definition');
+const srlab = require('./srlab');
 
 let output;
 let diagnostics;
+let srlabDiagnostics;
 let statusItem;
 let watchChild = null;
 
@@ -289,8 +291,9 @@ async function openMod(context) {
 /**
  * Тест мода идёт через sr-lab — отдельный инструмент (своя сборка движка, новая игра
  * и ходы без окна, проверки скриптов). Расширение лишь зовёт его
- * `python <sr-lab>/sr.py test local <мод>/build --as Группа\Мод`, если путь к sr-lab
- * указан в настройке srmod.tools.srlab; без неё команда недоступна.
+ * `python <sr-lab>/sr.py test local <мод>/build --as Группа\Мод --json <отчёт>`, если
+ * путь к sr-lab указан в настройке srmod.tools.srlab; без неё команда недоступна.
+ * Отчёт ложится в .srmod/ проекта, его находки — в «Проблемы» (src/srlab.js).
  */
 function modId(dir) {
     try {
@@ -299,7 +302,8 @@ function modId(dir) {
         if (parts.length && parts[0].toLowerCase() === 'mods') {
             parts.shift();
         }
-        // игра знает моды только как Группа\Мод; "Mods/Мод" без группы — имени не узнать
+        // игра находит мод на любой глубине под Mods, но тест sr-lab ставит мод только
+        // как Группа\Мод — "Mods/Мод" без группы ему не передать
         if (parts.length >= 2) {
             return `${parts[0]}\\${parts[1]}`;
         }
@@ -309,15 +313,21 @@ function modId(dir) {
     return null;
 }
 
+/** Отчёт sr-lab о проекте: .srmod/ — служебная папка srmod, она в .gitignore мода. */
+function srlabReportPath(dir) {
+    return path.join(dir, '.srmod', 'srlab-report.json');
+}
+
 /** Как запустить тест мода или null, если sr-lab не настроен. */
 function srlabTest(dir) {
     const cfg = vscode.workspace.getConfiguration('srmod');
-    const srlab = cfg.get('tools.srlab');
-    if (!srlab || !fs.existsSync(path.join(srlab, 'sr.py'))) {
+    const srlabDir = cfg.get('tools.srlab');
+    if (!srlabDir || !fs.existsSync(path.join(srlabDir, 'sr.py'))) {
         return null;
     }
     const id = modId(dir);
-    const args = [path.join(srlab, 'sr.py'), 'test', 'local', path.join(dir, 'build')];
+    const report = srlabReportPath(dir);
+    const args = [path.join(srlabDir, 'sr.py'), 'test', 'local', path.join(dir, 'build')];
     if (id) {
         args.push('--as', id);
     }
@@ -327,7 +337,52 @@ function srlabTest(dir) {
         args.push('--where', where);
     }
     args.push('--deps', cfg.get('test.deps') || 'steam');
-    return { cmd: cfg.get('pythonPath') || 'python', args, cwd: srlab, id };
+    args.push('--json', report);
+    return { cmd: cfg.get('pythonPath') || 'python', args, cwd: srlabDir, id };
+}
+
+/** Перед прогоном: старый отчёт и его замечания — долой, папка под новый — есть. */
+function srlabPrepare(dir) {
+    const report = srlabReportPath(dir);
+    fs.mkdirSync(path.dirname(report), { recursive: true });
+    fs.rmSync(report, { force: true });
+    srlabDiagnostics.clear();
+}
+
+/** Находки отчёта sr-lab → «Проблемы». Возвращает строку итога или null (отчёта нет). */
+function applySrlabReport(dir, id) {
+    let report;
+    try {
+        report = JSON.parse(fs.readFileSync(srlabReportPath(dir), 'utf8'));
+    } catch (e) {
+        return null;
+    }
+    const list = srlab.problems(report, { projectDir: dir, modId: id });
+    const severity = {
+        error: vscode.DiagnosticSeverity.Error,
+        warning: vscode.DiagnosticSeverity.Warning,
+        info: vscode.DiagnosticSeverity.Information,
+    };
+    const byFile = new Map();
+    for (const item of list) {
+        const range = new vscode.Range(item.line, 0, item.line, Number.MAX_SAFE_INTEGER);
+        const diag = new vscode.Diagnostic(range, item.message, severity[item.severity]);
+        diag.source = 'sr-lab';
+        if (item.code) {
+            diag.code = item.code;
+        }
+        if (!byFile.has(item.file)) {
+            byFile.set(item.file, []);
+        }
+        byFile.get(item.file).push(diag);
+    }
+    srlabDiagnostics.clear();
+    for (const [file, items] of byFile) {
+        srlabDiagnostics.set(vscode.Uri.file(file), items);
+    }
+    const verdict = srlab.summary(report, list);
+    log(`sr-lab: ${verdict}; отчёт — ${srlabReportPath(dir)}`);
+    return verdict;
 }
 
 async function testMod(context) {
@@ -347,8 +402,8 @@ async function testMod(context) {
     }
     if (!test.id) {
         vscode.window.showErrorMessage(
-            'В srmod.json поле install должно быть Mods\\Группа\\Мод — без группы не знаю, '
-            + 'как мод зовут в игре.');
+            'Тест sr-lab ставит мод как Группа\\Мод: в srmod.json поле install должно быть '
+            + 'Mods\\Группа\\Мод.');
         return;
     }
     if (!fs.existsSync(path.join(dir, 'build', 'ModuleInfo.txt'))) {
@@ -356,11 +411,27 @@ async function testMod(context) {
         return;
     }
     showOutput();
+    srlabPrepare(dir);
     log(`\n$ python ${test.args.join(' ')}`);
     const result = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Window, title: `srmod: тест ${test.id} в sr-lab` },
         () => runner.spawn({ cmd: test.cmd, args: [], cwd: test.cwd }, test.args, {}, log));
-    reportResult(result, `тест ${test.id} пройден`);
+    const verdict = applySrlabReport(dir, test.id);
+    if (!verdict) {
+        reportResult(result, `тест ${test.id} пройден`);   // sr-lab отказал до отчёта
+        return;
+    }
+    const show = result && result.code === 0
+        ? vscode.window.showInformationMessage(`sr-lab, ${test.id}: ${verdict}`, 'Показать проблемы')
+        : vscode.window.showErrorMessage(`sr-lab, ${test.id}: ${verdict}`, 'Показать проблемы',
+            'Показать вывод');
+    show.then((choice) => {
+        if (choice === 'Показать проблемы') {
+            vscode.commands.executeCommand('workbench.actions.view.problems');
+        } else if (choice === 'Показать вывод') {
+            showOutput();
+        }
+    });
 }
 
 // --------------------------------------------------------------------- задачи
@@ -440,8 +511,10 @@ function updateStatus(watching) {
 function activate(context) {
     output = vscode.window.createOutputChannel('srmod');
     diagnostics = vscode.languages.createDiagnosticCollection('srmod');
+    // находки sr-lab — отдельно от lint: сохранение файла (lintOnSave) их не стирает
+    srlabDiagnostics = vscode.languages.createDiagnosticCollection('sr-lab');
     statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    context.subscriptions.push(output, diagnostics, statusItem);
+    context.subscriptions.push(output, diagnostics, srlabDiagnostics, statusItem);
     updateStatus(false);
 
     const command = (id, handler) => context.subscriptions.push(
@@ -507,6 +580,30 @@ function activate(context) {
         vscode.languages.registerDefinitionProvider(
             'rangers-script', definition.definitionProvider(context)),
         vscode.tasks.registerTaskProvider('srmod', taskProvider(context)));
+
+    // задача `srmod: test` идёт мимо testMod: старый отчёт убрать до неё, новый разобрать после
+    const isTestTask = (e) => {
+        const def = e.execution.task.definition || {};
+        return def.type === 'srmod' && def.task === 'test';
+    };
+    context.subscriptions.push(
+        vscode.tasks.onDidStartTaskProcess(async (e) => {
+            if (isTestTask(e)) {
+                const dir = await project.current(context, { ask: false });
+                if (dir) {
+                    srlabPrepare(dir);
+                }
+            }
+        }),
+        vscode.tasks.onDidEndTaskProcess(async (e) => {
+            if (isTestTask(e)) {
+                const dir = await project.current(context, { ask: false });
+                const verdict = dir ? applySrlabReport(dir, modId(dir)) : null;
+                if (verdict) {
+                    vscode.window.setStatusBarMessage(`sr-lab: ${verdict}`, 10000);
+                }
+            }
+        }));
 
     context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (doc) => {
         if (doc.languageId !== 'rangers-script') {

@@ -72,7 +72,7 @@ UtilityFunctionsPack и константы — с коротким описан�
 | srmod: Создать новый мод… | `srmod new` |
 | srmod: Открыть готовый мод… | `srmod open` |
 | srmod: Гейт доверия | `srmod verify --gate` |
-| srmod: Тест мода в sr-lab | `sr.py test local build/` — новая игра с модом и ходы (нужен sr-lab) |
+| srmod: Тест мода в sr-lab | `sr.py test local build/` — проверки и новая игра с модом и ходы (нужен sr-lab); находки — в «Проблемы» |
 | srmod: Проверить инструменты | `srmod doctor` |
 
 ## Настройки
@@ -85,6 +85,12 @@ UtilityFunctionsPack и константы — с коротким описан�
 (15), `srmod.test.where` (где гонять: на этой системе или в Windows Sandbox),
 `srmod.test.deps` (зависимости — из Steam или из агрегатора). Без sr-lab команда
 недоступна, остальное расширение работает как прежде.
+
+Находки теста (команда и задача `srmod: test`) попадают в «Проблемы» с пометкой
+`sr-lab`: находка в собранном скрипте показывается на строке исходника `.rsm` с тем же
+кодом, в датнике — на его `.txt` из `src/`, итог теста — на `srmod.json`. Сам отчёт
+sr-lab лежит в `.srmod/srlab-report.json` проекта (страницей —
+`python <sr-lab>/sr.py test report .srmod/srlab-report.json`).
 
 ## Лицензия
 

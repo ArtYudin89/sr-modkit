@@ -17,6 +17,7 @@ const EXPECTED_COMMANDS = [
     'srmod.build', 'srmod.buildAndDeploy', 'srmod.deploy', 'srmod.lint',
     'srmod.doctor', 'srmod.verify', 'srmod.new', 'srmod.open',
     'srmod.watchStart', 'srmod.watchStop', 'srmod.selectProject', 'srmod.showOutput',
+    'srmod.test',
 ];
 
 const SAMPLE = [
