@@ -557,6 +557,20 @@ def _import_decompiler_run(cfg):
     return run
 
 
+def drop_text_entries(block):
+    """Убрать из дерева текстовые записи — следы комментариев и пустых строк исходника.
+
+    Читатель текста хранит их как записи вида «текст»; игре они не мешают
+    (TBlockParEC их пропускает), но BlockParEditor 2.0 на них спотыкается и молча
+    не открывает датник (найдено 10.10.2026 на Main.dat мода TowBeam: тот же текст
+    без них BPE читает). В собранном моде комментариев быть не должно.
+    """
+    block.entries = [e for e in block.entries if e.kind != srblockpar.KIND_TEXT]
+    for entry in block.entries:
+        if entry.kind == srblockpar.KIND_BLOCK:
+            drop_text_entries(entry.block)
+
+
 def run_blockpar(cfg, src_txt, dst_dat):
     """txt -> dat своим кодом (srmod/vendor/srblockpar), без внешних программ.
 
@@ -570,7 +584,9 @@ def run_blockpar(cfg, src_txt, dst_dat):
     dst_dat = Path(dst_dat)
     dst_dat.parent.mkdir(parents=True, exist_ok=True)
     try:
-        srblockpar.text_to_dat(src_txt, dst_dat)
+        tree = srblockpar.read_text(src_txt)
+        drop_text_entries(tree)
+        srblockpar.write_dat(dst_dat, tree)
     except (srblockpar.BlockParError, srblockpar.DatError, OSError) as e:
         raise BuildError(f'blockpar {src_txt} -> {dst_dat}: {e}')
     if dst_dat.stat().st_size <= 16:
