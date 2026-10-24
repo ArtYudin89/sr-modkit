@@ -50,16 +50,88 @@ class DatError(ValueError):
 
 
 def keystream(seed, size):
-    """Байты гаммы. Генератор тот же, что в игре, с усечением деления к нулю."""
+    """Байты гаммы. Генератор тот же, что в игре, с усечением деления к нулю.
+
+    Шаг игры — метод Шраге: для состояния x из 1…M−1 он даёт ровно
+    16807·x mod M (M = 2³¹−1), всегда снова из 1…M−1. Поэтому шаги по формуле
+    игры нужны, только пока состояние вне этого промежутка (отрицательное
+    семя, 0, M), дальше — умножение по модулю, и сразу кусками (`_fill_lanes`).
+    Байты те же (`tests/test_datfile.py` сверяет с шагом игры).
+    """
     out = bytearray(size)
     state = seed
-    for i in range(size):
+    index = 0
+    while index < size and not 0 < state < MODULUS:
         quotient = int(state / QUOTIENT)
         state = MULTIPLIER * (state - quotient * QUOTIENT) - REMAINDER * quotient
         if state <= 0:
             state += MODULUS
-        out[i] = (state - 1) & 0xFF
+        out[index] = (state - 1) & 0xFF
+        index += 1
+    if index < size:
+        if FAST_LANES and size - index >= _LANES:
+            _fill_lanes(out, index, state)
+        else:
+            for position in range(index, size):
+                state = state * MULTIPLIER % MODULUS
+                out[position] = (state - 1) & 0xFF
     return bytes(out)
+
+
+#: гамма кусками (`_fill_lanes`); False — по шагу, медленнее, байты те же
+FAST_LANES = True
+
+#: сколько состояний генератора в одном куске
+_LANES = 4096
+_LANE_BITS = 64
+#: младший байт состояния минус один — таблица для `bytes.translate`
+_MINUS_ONE = bytes((value - 1) & 0xFF for value in range(256))
+_LANE_TABLES = []
+
+
+def _lane_tables():
+    """(степени 16807¹…16807ᴷ mod M по 64-битным дорожкам одного целого,
+    маска младших 31 бита каждой дорожки, 16807ᴷ mod M) — один раз на процесс."""
+    if not _LANE_TABLES:
+        parts, value = [], 1
+        for _ in range(_LANES):
+            value = value * MULTIPLIER % MODULUS
+            parts.append(value.to_bytes(8, "little"))
+        powers = int.from_bytes(b"".join(parts), "little")
+        mask = int.from_bytes(MODULUS.to_bytes(8, "little") * _LANES, "little")
+        _LANE_TABLES.append((powers, mask, value))
+    return _LANE_TABLES[0]
+
+
+def _fold(value, mask):
+    """Остаток от деления на M = 2³¹−1 в каждой дорожке сразу.
+
+    В дорожке число меньше 2⁶² (произведение двух чисел меньше 2³¹), остаток
+    по простому модулю от него не 0. y mod M = (y & M) + (y >> 31) по модулю M:
+    после первого сложения меньше 2³², после второго — не больше M + 1, после
+    третьего — ровно остаток из 1…M−1. Сдвиг целого на 31 переносит в дорожку
+    биты соседней выше её 32-го бита — маска их отрезает.
+    """
+    value = (value & mask) + ((value >> 31) & mask)
+    value = (value & mask) + ((value >> 31) & mask)
+    return (value & mask) + ((value >> 31) & mask)
+
+
+def _fill_lanes(out, index, state):
+    """Гамма с места `index`, состояние перед ним — `state` (из 1…M−1).
+
+    Кусок из K состояний — одно большое целое, по 64 бита на состояние:
+    x·16807ⁱ (i = 1…K) — умножение целого на x, следующий кусок — на 16807ᴷ,
+    остатки — `_fold`. Младший байт каждой дорожки — срез байтов целого."""
+    powers, mask, jump = _lane_tables()
+    states = _fold(powers * state, mask)
+    total = len(out)
+    width = _LANE_BITS // 8
+    for start in range(index, total, _LANES):
+        take = min(_LANES, total - start)
+        low = states.to_bytes(width * _LANES, "little")[0:width * take:width]
+        out[start:start + take] = low.translate(_MINUS_ONE)
+        states = _fold(states * jump, mask)
 
 
 def apply_cipher(data, seed):

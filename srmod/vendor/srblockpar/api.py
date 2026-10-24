@@ -69,10 +69,11 @@ def write_dat(path, tree, kind=None, seed=datfile.DEFAULT_SEED, outer=True):
     return len(data)
 
 
-def read_text(path):
-    """Прочитать текстовый вид датника (UTF-16 с меткой или однобайтовый)."""
+def read_text(path, strict=False):
+    """Прочитать текстовый вид датника (UTF-16 или UTF-8 с меткой, иначе однобайтовый).
+    `strict` — как при сборке .dat: UTF-8 без метки — отказ (`blockpar.decode_text`)."""
     with open(path, "rb") as handle:
-        return blockpar.parse_text(blockpar.decode_text(handle.read()))
+        return blockpar.parse_text(blockpar.decode_text(handle.read(), strict=strict))
 
 
 def write_text(path, tree, ansi=False):
@@ -126,9 +127,10 @@ def dat_to_text(source, target=None, ansi=False):
 
 
 def text_to_dat(source, target=None, kind=None, seed=datfile.DEFAULT_SEED, outer=True):
-    """Собрать .dat из .txt. Вид дерева — по имени целевого файла."""
+    """Собрать .dat из .txt. Вид дерева — по имени целевого файла. UTF-8 без метки — отказ
+    `TextEncodingError` (с 1.1.0)."""
     target = target or os.path.splitext(str(source))[0] + ".dat"
-    tree = read_text(source)
+    tree = read_text(source, strict=True)
     write_dat(target, tree, kind, seed, outer)
     return target
 

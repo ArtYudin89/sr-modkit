@@ -60,22 +60,23 @@ def assert_rsm_is_utf8(path):
 def assert_not_utf8_datnik(path, data):
     """Гейт STAGE0.md: 'UTF-8 во входных .txt = падение'.
 
-    BlockParEditor молча портит UTF-8 на входе (даёт кракозябры, 0 ошибок) —
-    поэтому единственный безопасный контроль на нашей стороне: явно опознать
-    UTF-8 (с BOM или без, с настоящей кириллицей) и упасть ДО вызова BPE.
+    Исходники датников srmod читает как UTF-16 с BOM или cp1251 (`_decode_datnik`):
+    UTF-8 (с BOM или без, с настоящей кириллицей) прочитался бы кракозябрами без
+    единой ошибки, поэтому его надо явно опознать и упасть до сборки. Так же
+    приходилось делать и при прежней сборке через BlockParEditor.
     """
     if data[:3] == b'\xef\xbb\xbf':
-        raise BuildError(f'{path}: UTF-8+BOM запрещён для датников — '
-                          f'BlockParEditor молча портит вход (--lang.merge_into=txt)')
+        raise BuildError(f'{path}: UTF-8 с BOM для датников не принимается — '
+                          f'сохраните файл в UTF-16LE с BOM (или в cp1251)')
     if data[:2] in (BOM['utf-16le'], BOM['utf-16be']):
         return
     try:
         text = data.decode('utf-8')
     except UnicodeDecodeError:
-        return  # не UTF-8 (вероятно cp1251) — BPE это ест нормально
+        return  # не UTF-8 (вероятно cp1251) — так и читаем
     if any(ord(ch) >= 0x80 for ch in text):
         raise BuildError(f'{path}: похоже на UTF-8 без BOM с кириллицей — '
-                          f'запрещено для датников, нужен UTF-16LE+BOM')
+                          f'для датников нужен UTF-16LE с BOM (или cp1251)')
 
 
 def looks_like_utf8_datnik(data):

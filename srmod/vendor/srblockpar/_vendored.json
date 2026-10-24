@@ -1,15 +1,15 @@
 {
   "package": "srblockpar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "source": "sr-lab/srblockpar (локальный репозиторий, не публикуется)",
-  "source_commit": "3389aeb",
+  "source_commit": "976800f",
   "files": {
     "LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
-    "README.md": "c077dc4f736d4546393f21da94448cd5f6cdd67627c82350d1817ccc95453494",
-    "__init__.py": "754338419a908741a54a410880287f2976996ceea9bb9e3199a427169eeec583",
-    "api.py": "bebba4accffaf7dcb4fc5849f43de8dde0b5b66dec8e8ae6d76a21e08af7f4ad",
-    "blockpar.py": "80f8dbff0eca37c32526b3375432a5cacc89b5e2a946ace81ef287387cadb352",
-    "datfile.py": "1928098122c2fc207e2fad04510d363b9bc2bb557a0da6601ad4f9b2375f82b3",
+    "README.md": "138a549d6dc6ef6780994cc81170bd43a29ebf25d31fee5c6ec39cfa5cc5a5c3",
+    "__init__.py": "568aaf846ea03448f69dd3e0638c9d562ff769020d54adeb326bdc3218f3269d",
+    "api.py": "2fe8075c9a190bf946b6eb2cc0076ca7394cbc74b43699f7340f4f286a0d48be",
+    "blockpar.py": "c69caf040c464231dfbcac34b7eb4c861c3b1b378d05d399ef5c193ecc4af42b",
+    "datfile.py": "0b872ca0862ee720d832e9f3404782d37e9dbda82a4b12674de82b712ea4dcc2",
     "docs/dat-format.md": "626fc9c5b501aa209dac60f7a7d93948a68e3507a5a995d6ab1e30e5115fd692",
     "zl.py": "3fc6ace3ed8a959259639dfd06e3d544ff6d5b5223a89858cc6f1d71d4a89b2e"
   },

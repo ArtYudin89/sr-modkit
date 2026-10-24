@@ -41,9 +41,11 @@ from .blockpar import (  # noqa: F401
     KIND_BLOCK,
     KIND_STRING,
     KIND_TEXT,
+    TextEncodingError,
     decode_text,
     diff,
     from_dict,
+    looks_like_utf8,
     lossy_values,
     parse_text,
     read_tree,
@@ -59,14 +61,14 @@ from .datfile import (  # noqa: F401
 )
 from .zl import ZLError  # noqa: F401
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "read_dat", "write_dat", "read_text", "write_text", "read_json", "read_any",
     "dat_to_text", "text_to_dat", "kind_for_name", "same_tree", "describe",
     "DatDocument", "Block", "Entry", "parse_text", "render_text", "decode_text",
-    "text_bytes", "read_tree", "write_tree", "from_dict", "diff", "lossy_values",
-    "BlockParError", "DatError", "ZLError", "DEFAULT_SEED",
+    "looks_like_utf8", "text_bytes", "read_tree", "write_tree", "from_dict", "diff",
+    "lossy_values", "BlockParError", "TextEncodingError", "DatError", "ZLError", "DEFAULT_SEED",
     "CONTAINER_BLOCK", "CONTAINER_DATA",
     "KIND_TEXT", "KIND_STRING", "KIND_BLOCK", "FLAVOR_BLOCK", "FLAVOR_DATA",
     "__version__",

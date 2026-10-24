@@ -29,6 +29,10 @@ class BlockParError(ValueError):
     """Дерево не разбирается."""
 
 
+class TextEncodingError(BlockParError):
+    """Текст датника в кодировке, которую при сборке .dat прочитать верно нельзя."""
+
+
 class Entry(object):
     __slots__ = ("kind", "name", "value", "block", "group_index", "group_count", "comment")
 
@@ -160,7 +164,8 @@ class Block(object):
 
 class _Cursor(object):
     def __init__(self, data):
-        self.data = data
+        # поиск строк идёт `find`, которого у memoryview нет
+        self.data = data if isinstance(data, (bytes, bytearray)) else bytes(data)
         self.position = 0
 
     def need(self, length):
@@ -187,42 +192,87 @@ class _Cursor(object):
 
     def wide_string(self):
         data = self.data
-        end = self.position
-        while True:
-            if end + 2 > len(data):
-                raise BlockParError("строка не закрыта на смещении %d" % self.position)
-            if data[end] == 0 and data[end + 1] == 0:
-                break
-            end += 2
+        # два нуля подряд на чётном расстоянии от начала строки
+        end = data.find(b"\x00\x00", self.position)
+        while end >= 0 and (end - self.position) & 1:
+            end = data.find(b"\x00\x00", end + 1)
+        if end < 0:
+            raise BlockParError("строка не закрыта на смещении %d" % self.position)
         text = data[self.position:end].decode("utf-16-le", "replace")
         self.position = end + 2
         return text
 
 
+_INT32 = struct.Struct("<i").unpack_from
+_PAIR = struct.Struct("<ii").unpack_from
+
+
 def _read_tree(cursor, flavor):
+    """Блок с места курсора; курсор — за его конец. Те же отказы и места, что
+    у поштучного чтения `_Cursor` (`need`, `wide_string`), только смещение
+    держится в переменной."""
+    block, cursor.position = _read_block(cursor.data, cursor.position, flavor)
+    return block
+
+
+def _short(position):
+    return BlockParError("дерево обрывается на смещении %d" % position)
+
+
+def _read_block(data, pos, flavor):
+    size = len(data)
     if flavor == FLAVOR_BLOCK:
-        block = Block(sorted_index=bool(cursor.byte()))
+        if pos + 1 > size:
+            raise _short(pos)
+        block = Block(sorted_index=bool(data[pos]))
+        pos += 1
     else:
         block = Block(sorted_index=False)
-    count = cursor.int32()
+    if pos + 4 > size:
+        raise _short(pos)
+    count = _INT32(data, pos)[0]
+    pos += 4
     if count < 0:
         raise BlockParError("отрицательное число записей: %d" % count)
+    grouped = flavor == FLAVOR_BLOCK and block.sorted_index
+    append = block.entries.append
+    find = data.find
     for _ in range(count):
         group_index = group_count = 0
-        if flavor == FLAVOR_BLOCK and block.sorted_index:
-            group_index = cursor.int32()
-            group_count = cursor.int32()
-        kind = cursor.byte()
-        name = cursor.wide_string()
+        if grouped:
+            if pos + 4 > size:
+                raise _short(pos)
+            if pos + 8 > size:
+                raise _short(pos + 4)
+            group_index, group_count = _PAIR(data, pos)
+            pos += 8
+        if pos + 1 > size:
+            raise _short(pos)
+        kind = data[pos]
+        pos += 1
+        # строка: два нуля подряд на чётном расстоянии от её начала
+        end = find(b"\x00\x00", pos)
+        while end >= 0 and (end - pos) & 1:
+            end = find(b"\x00\x00", end + 1)
+        if end < 0:
+            raise BlockParError("строка не закрыта на смещении %d" % pos)
+        name = data[pos:end].decode("utf-16-le", "replace")
+        pos = end + 2
         entry = Entry(kind, name, group_index=group_index, group_count=group_count)
         if kind == KIND_STRING:
-            entry.value = cursor.wide_string()
+            end = find(b"\x00\x00", pos)
+            while end >= 0 and (end - pos) & 1:
+                end = find(b"\x00\x00", end + 1)
+            if end < 0:
+                raise BlockParError("строка не закрыта на смещении %d" % pos)
+            entry.value = data[pos:end].decode("utf-16-le", "replace")
+            pos = end + 2
         elif kind == KIND_BLOCK:
-            entry.block = _read_tree(cursor, flavor)
+            entry.block, pos = _read_block(data, pos, flavor)
         elif kind != KIND_TEXT:
             raise BlockParError("незнакомый вид записи %d у «%s»" % (kind, name))
-        block.entries.append(entry)
-    return block
+        append(entry)
+    return block, pos
 
 
 def read_tree(data, flavor=FLAVOR_BLOCK):
@@ -338,14 +388,36 @@ def parse_text(text):
     return root
 
 
-def decode_text(data):
-    """Текст датника из байтов: UTF-16 с меткой порядка или однобайтовый cp1251."""
+def looks_like_utf8(data):
+    """Байты без метки порядка, которые строго читаются как UTF-8 и не все ASCII, — так по
+    умолчанию сохраняют VS Code и Блокнот. Как cp1251 они читаются без ошибки, но кракозябрами;
+    настоящий текст в cp1251 строгой проверки UTF-8 почти никогда не проходит."""
+    if all(byte < 0x80 for byte in data):
+        return False
+    try:
+        data.decode("utf-8", "strict")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
+UTF8_WITHOUT_BOM = ("текст в UTF-8 без метки порядка байт (BOM): прочитанный как cp1251, в игре он "
+                    "был бы кракозябрами — пересохраните файл в UTF-8 с меткой, в UTF-16 или в "
+                    "cp1251 (ANSI)")
+
+
+def decode_text(data, strict=False):
+    """Текст датника из байтов: UTF-16 или UTF-8 с меткой порядка, иначе однобайтовый cp1251.
+    `strict` — для сборки .dat: UTF-8 без метки с не-ASCII — отказ `TextEncodingError` вместо
+    кракозябр (до 1.1.0 собиралось без ошибки; аудит 21.10.2026, F1021-link-blockpar-3)."""
     if data[:2] == b"\xff\xfe":
         return data[2:].decode("utf-16-le", "replace")
     if data[:2] == b"\xfe\xff":
         return data[2:].decode("utf-16-be", "replace")
     if data[:3] == b"\xef\xbb\xbf":
         return data[3:].decode("utf-8", "replace")
+    if strict and looks_like_utf8(data):
+        raise TextEncodingError(UTF8_WITHOUT_BOM)
     return data.decode("cp1251", "replace")
 
 
