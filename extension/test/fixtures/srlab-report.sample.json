@@ -1,0 +1,119 @@
+{
+ "info": {
+  "local": [
+   "C:\\mods\\TowBeam\\build"
+  ],
+  "format": 1
+ },
+ "results": [
+  {
+   "mod": "Artem\\TowBeam",
+   "version": "local",
+   "mods": [
+    "Tweaks\\UtilityFunctionsPack",
+    "Artem\\TowBeam"
+   ],
+   "verdict": "fail",
+   "reasons": [
+    {
+     "stage": "quests",
+     "text": "квесты: ошибок 2, не читаются 0"
+    }
+   ],
+   "where": null,
+   "turns_done": 0,
+   "turns": 15,
+   "seconds": 0,
+   "notes": [],
+   "stages": {
+    "static": {
+     "verdict": "pass",
+     "error_count": 0,
+     "unloaded_error_count": 0,
+     "unloaded_scripts": [],
+     "misread_count": 0,
+     "misread_scripts": [],
+     "guarded_count": 0,
+     "guarded": [],
+     "unreachable_count": 0,
+     "skipped_dirs": [],
+     "scripts": 1,
+     "unreadable": [],
+     "unreadable_why": [],
+     "levels": {},
+     "errors": [],
+     "warning_count": 0,
+     "warnings": [],
+     "suppressed_count": 0,
+     "suppressed": [],
+     "ignore_files": [],
+     "ignore_unused": [],
+     "camp_names": "папка C:\\Games\\Space Rangers HD A War Apart\\Mods",
+     "camp_names_error": null
+    },
+    "dats": {
+     "verdict": "pass",
+     "files": 4,
+     "unreadable": []
+    },
+    "registry": {
+     "verdict": "pass",
+     "error_count": 0,
+     "errors": [],
+     "warning_count": 0,
+     "warnings": []
+    },
+    "quests": {
+     "verdict": "fail",
+     "files": 1,
+     "unreadable": [],
+     "errors": [
+      {
+       "level": "error",
+       "code": "dup-path",
+       "message": "номер перехода 5 повторяется 2 раз — нажатие ведёт по последнему",
+       "jump": 5,
+       "file": "DATA\\Quest\\Rus\\TowBeam.qmm"
+      },
+      {
+       "level": "error",
+       "code": "dup-path",
+       "message": "номер перехода 7 повторяется 2 раз — нажатие ведёт по последнему",
+       "path": 7,
+       "file": "DATA\\Quest\\Rus\\TowBeam.qmm"
+      }
+     ],
+     "error_count": 2
+    },
+    "native": {
+     "files": [],
+     "unapproved": []
+    },
+    "game": {
+     "verdict": "not_run",
+     "where": null,
+     "turns_done": 0,
+     "seconds": 0,
+     "reasons": []
+    }
+   },
+   "checks": 11,
+   "no_game": true,
+   "plan": {
+    "given": "C:\\mods\\TowBeam\\build",
+    "folder": "C:\\mods\\TowBeam\\build",
+    "name_source": "explicit",
+    "name_note": null,
+    "title": "TowBeam",
+    "identity": "Artem\\TowBeam",
+    "deps_source": "игра в Steam (C:\\Games\\Space Rangers HD A War Apart)",
+    "dependencies": [
+     "Tweaks\\UtilityFunctionsPack"
+    ],
+    "with": [],
+    "missing": [],
+    "conflicts": []
+   }
+  }
+ ]
+}

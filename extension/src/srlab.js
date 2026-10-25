@@ -16,10 +16,15 @@
  *     строки — точка входа скрипта, строка 1, а код — в тексте замечания;
  *   - build/X.dat → src/X.txt (датник собирается из текста), build/X → src/X;
  *   - всё, что не легло на файл мода, и итог теста — на srmod.json.
+ *
+ * Какие поля читаются — README.md sr-lab, абзац «Отчёт --json»; номер формата отчёта —
+ * `info.format`. Незнакомый номер — предупреждение на srmod.json (отчёт всё равно
+ * читается), отчёт без номера — sr-lab до format 1, читается как раньше.
  */
 const fs = require('fs');
 const path = require('path');
 
+const REPORT_FORMAT = 1;   // info.format отчёта, который знает расширение
 const SEVERITY = { 'ошибка': 'error', 'внимание': 'warning' };
 const FAILED = new Set(['fail', 'error', 'crash', 'hang', 'timeout']);
 const MAX_PLACES = 10;   // мест одной находки (одинаковая строка кода повторяется)
@@ -157,10 +162,25 @@ function problems(report, ctx) {
         return null;
     };
 
+    // об одном датнике sr-lab пишет только имя файла: ищем его в build/CFG
+    const datPath = (file) => {
+        if (typeof file !== 'string' || !file || /[\\/]/.test(file)) {
+            return file;
+        }
+        const cfg = path.join(buildDir, 'CFG');
+        if (fs.existsSync(path.join(cfg, file))) {
+            return path.join(cfg, file);
+        }
+        const name = file.toLowerCase();
+        return walk(cfg, ['.dat'], []).find((f) => path.basename(f).toLowerCase() === name) || file;
+    };
+
     const place = (finding, severity) => {
         const label = finding.rule ? ` [${finding.rule}]` : '';
         const message = `${finding.message || finding.error || finding.msg || 'замечание sr-lab'}${label}`;
-        let file = finding.path || finding.file || '';
+        // путь — только из строк: у находок квестов sr-lab до format 1 в `path` лежал номер
+        // перехода, и path.isAbsolute(число) ронял разбор всего отчёта
+        let file = [finding.file, finding.path].find((v) => typeof v === 'string' && v) || '';
         if (file && !path.isAbsolute(file)) {
             file = path.join(buildDir, file);
         }
@@ -199,6 +219,13 @@ function problems(report, ctx) {
         add(fs.existsSync(file) ? file : manifest, lineOf(finding), severity, message, finding.rule);
     };
 
+    const format = report && report.info ? report.info.format : undefined;
+    if (format !== undefined && format !== null && format !== REPORT_FORMAT) {
+        add(manifest, 0, 'warning', `формат отчёта sr-lab ${format} не знаком расширению `
+            + `(оно знает ${REPORT_FORMAT}): находки могли потеряться или лечь не туда — `
+            + 'обновите расширение sr-modkit', 'sr-lab');
+    }
+
     const results = (report && report.results) || [];
     const wanted = ctx.modId ? results.filter((r) => sameMod(r.mod, ctx.modId)) : [];
     for (const result of wanted.length ? wanted : results) {
@@ -215,11 +242,16 @@ function problems(report, ctx) {
             place({ path: file, message: 'sr-lab не смог прочитать этот скрипт' }, 'warning');
         }
         for (const f of ((stages.dats || {}).unreadable || [])) {
-            place({ file: f.file, message: `датник не читается: ${f.error}` }, 'warning');
+            place({ file: datPath(f.file), message: `датник не читается: ${f.error}` }, 'warning');
         }
         const quests = stages.quests || {};
-        for (const f of (quests.errors || []).concat(quests.unreadable || [])) {
-            place(typeof f === 'string' ? { path: f, message: 'квест не читается' } : f, 'warning');
+        // `code` находки квеста — имя правила (dup-path), а не строка кода, как у скриптов
+        for (const f of quests.errors || []) {
+            place({ file: f.file, path: f.path, message: f.message, rule: f.code }, 'warning');
+        }
+        for (const f of quests.unreadable || []) {
+            place(typeof f === 'string' ? { path: f, message: 'квест не читается' }
+                : { file: f.file, message: `квест не читается: ${f.error}` }, 'warning');
         }
         // итог: почему мод не прошёл (игра, проверки) — одной строкой на srmod.json
         const reasons = (result.reasons || []).map((r) => r.text || String(r)).filter(Boolean);

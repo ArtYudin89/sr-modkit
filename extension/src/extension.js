@@ -357,7 +357,18 @@ function applySrlabReport(dir, id) {
     } catch (e) {
         return null;
     }
-    const list = srlab.problems(report, { projectDir: dir, modId: id });
+    let list;
+    let verdict;
+    try {
+        list = srlab.problems(report, { projectDir: dir, modId: id });
+        verdict = srlab.summary(report, list);
+    } catch (e) {
+        // отчёт не того вида, что знает расширение: сказать об этом, а не оборвать команду
+        verdict = `отчёт не разобран (${(e && e.message) || e})`;
+        list = [{ file: path.join(dir, 'srmod.json'), line: 0, severity: 'error', code: 'sr-lab',
+            message: `sr-lab: ${verdict} — находки не показаны; отчёт целиком: `
+                + `python <sr-lab>/sr.py test report ${srlabReportPath(dir)}` }];
+    }
     const severity = {
         error: vscode.DiagnosticSeverity.Error,
         warning: vscode.DiagnosticSeverity.Warning,
@@ -380,7 +391,6 @@ function applySrlabReport(dir, id) {
     for (const [file, items] of byFile) {
         srlabDiagnostics.set(vscode.Uri.file(file), items);
     }
-    const verdict = srlab.summary(report, list);
     log(`sr-lab: ${verdict}; отчёт — ${srlabReportPath(dir)}`);
     return verdict;
 }
