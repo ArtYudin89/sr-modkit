@@ -2,7 +2,7 @@
   "package": "srblockpar",
   "version": "1.1.0",
   "source": "sr-lab/srblockpar (локальный репозиторий, не публикуется)",
-  "source_commit": "976800f",
+  "source_commit": "09b96b8",
   "files": {
     "LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
     "README.md": "138a549d6dc6ef6780994cc81170bd43a29ebf25d31fee5c6ec39cfa5cc5a5c3",
