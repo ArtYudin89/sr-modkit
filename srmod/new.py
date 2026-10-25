@@ -21,6 +21,13 @@ from pathlib import Path
 from .build import BuildError, _encode_datnik
 
 _NAME_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
+_GROUP_RE = re.compile(r'^[A-Za-z0-9_][A-Za-z0-9_.-]*$')
+
+# Папка-группа в Mods, куда ложится новый мод: Mods/<группа>/<имя>. Так лежат почти все
+# моды (Mods/Tweaks/…, Mods/Expansion/…), и только так мод принимает тест в sr-lab
+# (Группа\Мод); прежнее умолчание Mods/<имя> он не принимал (аудит 21.10.2026,
+# F1021-link-modkit-srlab-1).
+DEFAULT_GROUP = 'MyMods'
 
 # --------------------------------------------------------------------- минимальный
 
@@ -221,15 +228,21 @@ def _write_sample_media(items_dir, name):
 # --------------------------------------------------------------------- скаффолд
 
 def scaffold(dest, name, install=None, primary_lang='Rus', languages=None,
-             force=False, minimal=False):
+             force=False, minimal=False, group=None):
+    """`install` — путь установки от корня игры целиком; без него — Mods/<group>/<name>."""
     dest = Path(dest)
     if not _NAME_RE.match(name):
         raise BuildError(f'"{name}": имя мода должно быть [A-Za-z][A-Za-z0-9_]* '
                           f'(это и scriptName, и имя .scr, и CT-префикс)')
+    if not install:
+        group = DEFAULT_GROUP if group is None else group
+        if not _GROUP_RE.match(group):
+            raise BuildError(f'"{group}": группа — одна папка в Mods, имя из латиницы, цифр и _ . - '
+                              f'(другой путь задаётся целиком: --install)')
+        install = f'Mods/{group}/{name}'
     if dest.exists() and any(dest.iterdir()) and not force:
         raise BuildError(f'{dest}: не пусто (--force для игнора)')
     languages = languages or [primary_lang]
-    install = install or f'Mods/{name}'
     src = dest / 'src'
 
     script_dir = src / 'DATA' / 'Script'

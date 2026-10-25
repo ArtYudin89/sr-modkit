@@ -198,6 +198,24 @@ check('номер формата отчёта: незнакомый — пред
     assert.deepStrictEqual(srlab.problems(report({ verdict: 'pass' }), ctx), []);
 });
 
+check('имя мода для sr-lab из install: только Mods/Группа/Мод', () => {
+    assert.deepStrictEqual(srlab.modIdFromInstall('Mods/Artem/TowBeam'),
+        { id: 'Artem\\TowBeam', problem: null });
+    assert.strictEqual(srlab.modIdFromInstall('Mods\\MyMods\\X').id, 'MyMods\\X');
+    const noGroup = srlab.modIdFromInstall('Mods/X');
+    assert.strictEqual(noGroup.id, null);
+    assert.ok(/нет группы.*Mods\/<Группа>\/<Мод>/.test(noGroup.problem), noGroup.problem);
+    // три уровня раньше молча усекались до A\B — тест поставил бы мод не туда
+    const deep = srlab.modIdFromInstall('Mods/A/B/C');
+    assert.strictEqual(deep.id, null);
+    assert.ok(/только как Группа\\Мод/.test(deep.problem), deep.problem);
+    for (const empty of ['', undefined, 'Mods', '/']) {
+        const none = srlab.modIdFromInstall(empty);
+        assert.strictEqual(none.id, null);
+        assert.ok(/install не задан/.test(none.problem), `${empty}: ${none.problem}`);
+    }
+});
+
 fs.rmSync(root, { recursive: true, force: true });
 console.log(failures ? `\nПРОВАЛОВ: ${failures}` : '\nвсё зелёное');
 process.exit(failures ? 1 : 0);

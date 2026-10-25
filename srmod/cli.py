@@ -57,7 +57,11 @@ def build_parser():
     p_new.add_argument('--name', required=True, help='имя мода (scriptName/имя .scr)')
     p_new.add_argument('--minimal', action='store_true',
                        help='голый скаффолд без комментариев/диалогов/медиа')
-    p_new.add_argument('--install', help='путь установки от корня игры (по умолчанию Mods/Artem/<name>)')
+    where = p_new.add_mutually_exclusive_group()
+    where.add_argument('--group',
+                       help=f'папка-группа в Mods, куда ляжет мод (по умолчанию {newmod.DEFAULT_GROUP})')
+    where.add_argument('--install',
+                       help='путь установки от корня игры целиком (по умолчанию Mods/<group>/<name>)')
     p_new.add_argument('--primary-lang', default='Rus')
     p_new.add_argument('--lang', dest='languages', action='append',
                        help='дополнительный язык (можно повторять); по умолчанию только primary')
@@ -138,7 +142,7 @@ def main(argv=None):
     if args.command == 'new':
         languages = list(dict.fromkeys([args.primary_lang] + (args.languages or [])))
         try:
-            dest = newmod.scaffold(args.dest, args.name, install=args.install,
+            dest = newmod.scaffold(args.dest, args.name, install=args.install, group=args.group,
                                    primary_lang=args.primary_lang, languages=languages,
                                    force=args.force, minimal=args.minimal)
         except buildmod.BuildError as e:

@@ -11,7 +11,7 @@
     },
     "install": {
       "type": "string",
-      "description": "Путь установки от корня игры, например Mods/Artem/MyMod. От него зависят CacheData.dat и INSTALL.TXT."
+      "description": "Путь установки от корня игры: Mods/<Группа>/<Мод>, например Mods/MyMods/MyMod (так его пишет srmod new; тест в sr-lab принимает только такой вид). От него зависят CacheData.dat и INSTALL.TXT."
     },
     "languages": {
       "type": "array",

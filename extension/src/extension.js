@@ -294,23 +294,17 @@ async function openMod(context) {
  * `python <sr-lab>/sr.py test local <мод>/build --as Группа\Мод --json <отчёт>`, если
  * путь к sr-lab указан в настройке srmod.tools.srlab; без неё команда недоступна.
  * Отчёт ложится в .srmod/ проекта, его находки — в «Проблемы» (src/srlab.js).
+ * Имя мода для --as — {id, problem} из install в srmod.json (srlab.modIdFromInstall).
  */
 function modId(dir) {
+    let cfg;
     try {
-        const raw = fs.readFileSync(path.join(dir, 'srmod.json'), 'utf8').replace(/^\uFEFF/, '');
-        const parts = String(JSON.parse(raw).install || '').split(/[\\/]+/).filter(Boolean);
-        if (parts.length && parts[0].toLowerCase() === 'mods') {
-            parts.shift();
-        }
-        // игра находит мод на любой глубине под Mods, но тест sr-lab ставит мод только
-        // как Группа\Мод — "Mods/Мод" без группы ему не передать
-        if (parts.length >= 2) {
-            return `${parts[0]}\\${parts[1]}`;
-        }
+        cfg = JSON.parse(fs.readFileSync(path.join(dir, 'srmod.json'), 'utf8').replace(/^\uFEFF/, ''));
     } catch (e) {
-        // srmod.json может быть недописан прямо сейчас — скажем ниже
+        // srmod.json может быть недописан прямо сейчас — скажем об этом вместо теста
+        return { id: null, problem: `srmod.json не читается: ${e.message}` };
     }
-    return null;
+    return srlab.modIdFromInstall((cfg || {}).install);
 }
 
 /** Отчёт sr-lab о проекте: .srmod/ — служебная папка srmod, она в .gitignore мода. */
@@ -325,7 +319,7 @@ function srlabTest(dir) {
     if (!srlabDir || !fs.existsSync(path.join(srlabDir, 'sr.py'))) {
         return null;
     }
-    const id = modId(dir);
+    const { id, problem } = modId(dir);
     const report = srlabReportPath(dir);
     const args = [path.join(srlabDir, 'sr.py'), 'test', 'local', path.join(dir, 'build')];
     if (id) {
@@ -338,7 +332,7 @@ function srlabTest(dir) {
     }
     args.push('--deps', cfg.get('test.deps') || 'steam');
     args.push('--json', report);
-    return { cmd: cfg.get('pythonPath') || 'python', args, cwd: srlabDir, id };
+    return { cmd: cfg.get('pythonPath') || 'python', args, cwd: srlabDir, id, problem };
 }
 
 /** Перед прогоном: старый отчёт и его замечания — долой, папка под новый — есть. */
@@ -411,9 +405,7 @@ async function testMod(context) {
         return;
     }
     if (!test.id) {
-        vscode.window.showErrorMessage(
-            'Тест sr-lab ставит мод как Группа\\Мод: в srmod.json поле install должно быть '
-            + 'Mods\\Группа\\Мод.');
+        vscode.window.showErrorMessage(`Тест мода в sr-lab не запущен: ${test.problem}.`);
         return;
     }
     if (!fs.existsSync(path.join(dir, 'build', 'ModuleInfo.txt'))) {
@@ -608,7 +600,7 @@ function activate(context) {
         vscode.tasks.onDidEndTaskProcess(async (e) => {
             if (isTestTask(e)) {
                 const dir = await project.current(context, { ask: false });
-                const verdict = dir ? applySrlabReport(dir, modId(dir)) : null;
+                const verdict = dir ? applySrlabReport(dir, modId(dir).id) : null;
                 if (verdict) {
                     vscode.window.setStatusBarMessage(`sr-lab: ${verdict}`, 10000);
                 }

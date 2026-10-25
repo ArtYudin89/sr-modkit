@@ -266,6 +266,32 @@ function problems(report, ctx) {
     return out;
 }
 
+/**
+ * Имя мода для `sr.py test local --as` из поля install srmod.json: {id, problem}.
+ * Игра находит мод на любой глубине под Mods, но тест sr-lab ставит мод только как
+ * Группа\Мод: без группы или глубже двух уровней — отказ с объяснением (раньше три
+ * уровня молча усекались до двух, и тест поставил бы мод не туда).
+ */
+function modIdFromInstall(install) {
+    const parts = String(install || '').split(/[\\/]+/).filter(Boolean);
+    if (parts.length && parts[0].toLowerCase() === 'mods') {
+        parts.shift();
+    }
+    const want = 'впишите Mods/<Группа>/<Мод>, пересоберите и повторите deploy';
+    if (!parts.length) {
+        return { id: null, problem: `install не задан: в srmod.json нужен путь мода — ${want}` };
+    }
+    if (parts.length === 1) {
+        return { id: null, problem: `install «${install}»: нет группы — тест sr-lab ставит мод `
+            + `только как Группа\\Мод; ${want}` };
+    }
+    if (parts.length > 2) {
+        return { id: null, problem: `install «${install}»: тест sr-lab ставит мод только как `
+            + `Группа\\Мод, а здесь уровней ${parts.length}; ${want}` };
+    }
+    return { id: `${parts[0]}\\${parts[1]}`, problem: null };
+}
+
 function lineOf(finding) {
     return finding.line ? finding.line - 1 : 0;
 }
@@ -292,4 +318,4 @@ function summary(report, list) {
     return `${verdicts}; ошибок ${errors}, предупреждений ${warnings}`;
 }
 
-module.exports = { problems, summary, normalizeCode, projectScripts, findCode };
+module.exports = { problems, summary, modIdFromInstall, normalizeCode, projectScripts, findCode };

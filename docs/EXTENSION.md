@@ -106,7 +106,12 @@ UTF-16-файлами игры.
 
 ```
 node extension/test/dsl.test.js
+node extension/test/srlab.test.js
 ```
+
+`srlab.test.js` — перевод отчёта sr-lab в «Проблемы» и имя мода для теста из `install`;
+`test/fixtures/srlab-report.sample.json` — настоящий отчёт sr-lab (format 1) с дописанными
+руками находками квеста, откуда он взят — в заголовке теста.
 
 **В настоящем Extension Host** — активация, регистрация команд, ответы
 провайдеров. Профиль пользователя не трогается, всё в отдельных каталогах:
@@ -135,6 +140,7 @@ Code.exe --user-data-dir <tmp>\u --extensions-dir <tmp>\e ^
 ```
 python tools/sync_extension.py --regen
 node extension/test/dsl.test.js
+node extension/test/srlab.test.js
 npx @vscode/vsce package        # из папки extension/, требует сети
 ```
 
